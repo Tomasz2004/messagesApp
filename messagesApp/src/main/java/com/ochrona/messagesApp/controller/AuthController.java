@@ -1,0 +1,106 @@
+package com.ochrona.messagesApp.controller;
+
+import com.ochrona.messagesApp.dto.*;
+import com.ochrona.messagesApp.security.SecurityUtils;
+import com.ochrona.messagesApp.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Kontroler autentykacji i autoryzacji
+ */
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Authentication", description = "Endpoints for user authentication and registration")
+public class AuthController {
+
+    private final UserService userService;
+    private final SecurityUtils securityUtils;
+
+    @PostMapping("/register")
+    @Operation(summary = "Register a new user", description = "Creates a new user account with encrypted RSA keys and TOTP setup")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        try {
+            RegisterResponse response = userService.registerUser(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            log.error("Registration failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(
+                    RegisterResponse.builder()
+                            .message(e.getMessage())
+                            .build());
+        } catch (Exception e) {
+            log.error("Registration error", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    RegisterResponse.builder()
+                            .message("Registration failed: " + e.getMessage())
+                            .build());
+        }
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Login user", description = "Authenticates user with username, password and optional TOTP code")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = userService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.error("Login failed: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    LoginResponse.builder()
+                            .message(e.getMessage())
+                            .build());
+        } catch (Exception e) {
+            log.error("Login error", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    LoginResponse.builder()
+                            .message("Login failed: " + e.getMessage())
+                            .build());
+        }
+    }
+
+    @PostMapping("/totp/enable")
+    @Operation(summary = "Enable TOTP 2FA", description = "Enables TOTP two-factor authentication for the user. " +
+            "IMPORTANT: Before calling this endpoint, scan the QR code from registration response " +
+            "in Google Authenticator (or similar app). Then provide the current 6-digit code from " +
+            "the app to verify that 2FA is properly configured. This prevents account lockout.")
+    public ResponseEntity<String> enableTOTP(
+            HttpServletRequest request,
+            @Valid @RequestBody EnableTotpRequest totpRequest) {
+        try {
+            Long userId = securityUtils.getCurrentUserId(request);
+            userService.enableTOTP(userId, totpRequest.getTotpCode());
+            return ResponseEntity.ok("TOTP enabled successfully");
+        } catch (IllegalArgumentException e) {
+            log.error("TOTP enable failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            log.error("TOTP enable error", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to enable TOTP: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/totp/disable")
+    @Operation(summary = "Disable TOTP 2FA", description = "Disables TOTP two-factor authentication for the user")
+    public ResponseEntity<String> disableTOTP(HttpServletRequest request) {
+        try {
+            Long userId = securityUtils.getCurrentUserId(request);
+            userService.disableTOTP(userId);
+            return ResponseEntity.ok("TOTP disabled successfully");
+        } catch (Exception e) {
+            log.error("TOTP disable error", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to disable TOTP: " + e.getMessage());
+        }
+    }
+}
