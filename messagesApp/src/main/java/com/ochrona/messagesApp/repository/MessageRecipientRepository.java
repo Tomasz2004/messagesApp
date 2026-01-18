@@ -12,12 +12,17 @@ import java.util.Optional;
 @Repository
 public interface MessageRecipientRepository extends JpaRepository<MessageRecipient, Long> {
 
-    List<MessageRecipient> findByRecipientIdAndDeletedFalseOrderByMessageCreatedAtDesc(Long recipientId);
+    // Dla odebranych wiadomości - tylko gdzie NIE jest nadawcą (isSender = false)
+    List<MessageRecipient> findByRecipientIdAndDeletedFalseAndIsSenderFalseOrderByMessageCreatedAtDesc(
+            Long recipientId);
 
     List<MessageRecipient> findByMessageId(Long messageId);
 
     Optional<MessageRecipient> findByMessageIdAndRecipientId(Long messageId, Long recipientId);
 
-    @Query("SELECT COUNT(mr) FROM MessageRecipient mr WHERE mr.recipient.id = :recipientId AND mr.isRead = false AND mr.deleted = false")
+    // Dla wysłanych wiadomości - tylko kopia nadawcy (isSender = true)
+    List<MessageRecipient> findByRecipientIdAndDeletedFalseAndIsSenderTrueOrderByMessageCreatedAtDesc(Long recipientId);
+
+    @Query("SELECT COUNT(mr) FROM MessageRecipient mr WHERE mr.recipient.id = :recipientId AND mr.isRead = false AND mr.deleted = false AND mr.isSender = false")
     long countUnreadByRecipientId(@Param("recipientId") Long recipientId);
 }

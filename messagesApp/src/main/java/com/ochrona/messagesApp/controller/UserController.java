@@ -39,6 +39,7 @@ public class UserController {
                             .username(user.getUsername())
                             .email(user.getEmail())
                             .publicKey(user.getPublicKey())
+                            .totpEnabled(user.getTotpEnabled())
                             .build())
                     .collect(Collectors.toList());
 
@@ -59,6 +60,7 @@ public class UserController {
                     .username(user.getUsername())
                     .email(user.getEmail())
                     .publicKey(user.getPublicKey())
+                    .totpEnabled(user.getTotpEnabled())
                     .build();
 
             return ResponseEntity.ok(response);
@@ -82,6 +84,7 @@ public class UserController {
                     .username(user.getUsername())
                     .email(user.getEmail())
                     .publicKey(user.getPublicKey())
+                    .totpEnabled(user.getTotpEnabled())
                     .build();
 
             return ResponseEntity.ok(response);

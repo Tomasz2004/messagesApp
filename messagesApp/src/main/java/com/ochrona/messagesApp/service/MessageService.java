@@ -42,26 +42,24 @@ public class MessageService {
                 .orElseThrow(() -> new IllegalArgumentException("Sender not found"));
 
         // Walidacja odbiorców
-        if (request.getRecipientIds() == null || request.getRecipientIds().isEmpty()) {
+        if (request.getRecipients() == null || request.getRecipients().isEmpty()) {
             throw new IllegalArgumentException("At least one recipient is required");
         }
 
-        List<User> recipients = userRepository.findAllById(request.getRecipientIds());
-        if (recipients.size() != request.getRecipientIds().size()) {
-            throw new IllegalArgumentException("One or more recipients not found");
-        }
+        List<Long> recipientIds = request.getRecipients().stream()
+                .map(SendMessageRequest.RecipientKey::getRecipientId)
+                .collect(Collectors.toList());
 
-        // Walidacja kluczy dla odbiorców
-        if (request.getRecipientKeys() == null ||
-                request.getRecipientKeys().size() != request.getRecipientIds().size()) {
-            throw new IllegalArgumentException("Encrypted AES key required for each recipient");
+        List<User> recipients = userRepository.findAllById(recipientIds);
+        if (recipients.size() != recipientIds.size()) {
+            throw new IllegalArgumentException("One or more recipients not found");
         }
 
         // Tworzenie wiadomości
         Message message = Message.builder()
                 .sender(sender)
-                .subjectEncrypted(request.getEncryptedSubject())
-                .contentEncrypted(request.getEncryptedContent())
+                .subjectEncrypted(request.getSubjectEncrypted())
+                .contentEncrypted(request.getContentEncrypted())
                 .signature(request.getSignature())
                 .iv(request.getIv())
                 .build();
@@ -69,7 +67,7 @@ public class MessageService {
         message = messageRepository.save(message);
 
         // Tworzenie rekordów dla odbiorców z zaszyfrowanymi kluczami AES
-        Map<Long, String> recipientKeyMap = request.getRecipientKeys().stream()
+        Map<Long, String> recipientKeyMap = request.getRecipients().stream()
                 .collect(Collectors.toMap(
                         SendMessageRequest.RecipientKey::getRecipientId,
                         SendMessageRequest.RecipientKey::getEncryptedAesKey));
@@ -82,11 +80,15 @@ public class MessageService {
                         "Missing encrypted AES key for recipient: " + recipient.getUsername());
             }
 
+            // Sprawdź czy to nadawca (kopia dla niego)
+            boolean isSenderCopy = recipient.getId().equals(senderId);
+
             MessageRecipient mr = MessageRecipient.builder()
                     .message(message)
                     .recipient(recipient)
                     .aesKeyEncrypted(encryptedAesKey)
-                    .isRead(false)
+                    .isSender(isSenderCopy)
+                    .isRead(isSenderCopy) // Nadawca ma już "przeczytaną" swoją wiadomość
                     .deleted(false)
                     .build();
 
@@ -120,12 +122,13 @@ public class MessageService {
     }
 
     /**
-     * Pobranie otrzymanych wiadomości
+     * Pobranie otrzymanych wiadomości (tylko te gdzie użytkownik jest prawdziwym
+     * odbiorcą, nie nadawcą)
      */
     @Transactional(readOnly = true)
     public List<MessageResponse> getReceivedMessages(Long userId) {
         List<MessageRecipient> messageRecipients = messageRecipientRepository
-                .findByRecipientIdAndDeletedFalseOrderByMessageCreatedAtDesc(userId);
+                .findByRecipientIdAndDeletedFalseAndIsSenderFalseOrderByMessageCreatedAtDesc(userId);
 
         return messageRecipients.stream()
                 .map(mr -> {
@@ -138,17 +141,20 @@ public class MessageService {
     }
 
     /**
-     * Pobranie wysłanych wiadomości
+     * Pobranie wysłanych wiadomości (przez kopię nadawcy w message_recipients)
      */
     @Transactional(readOnly = true)
     public List<MessageResponse> getSentMessages(Long userId) {
-        List<Message> messages = messageRepository.findBySenderIdOrderByCreatedAtDesc(userId);
+        // Pobierz tylko kopie nadawcy (isSender = true)
+        List<MessageRecipient> senderCopies = messageRecipientRepository
+                .findByRecipientIdAndDeletedFalseAndIsSenderTrueOrderByMessageCreatedAtDesc(userId);
 
-        return messages.stream()
-                .map(message -> {
-                    List<MessageRecipient> recipients = messageRecipientRepository.findByMessageId(message.getId());
+        return senderCopies.stream()
+                .map(senderCopy -> {
+                    Message message = senderCopy.getMessage();
+                    List<MessageRecipient> allRecipients = messageRecipientRepository.findByMessageId(message.getId());
                     List<Attachment> attachments = attachmentRepository.findByMessageId(message.getId());
-                    return buildMessageResponse(message, recipients, attachments, null, userId);
+                    return buildMessageResponse(message, allRecipients, attachments, senderCopy, userId);
                 })
                 .collect(Collectors.toList());
     }
@@ -200,18 +206,42 @@ public class MessageService {
 
     /**
      * Usunięcie wiadomości (soft delete)
+     * Nadawca może usunąć dla wszystkich, odbiorca tylko dla siebie
      */
     @Transactional
     public void deleteMessage(Long messageId, Long userId) {
-        MessageRecipient messageRecipient = messageRecipientRepository
-                .findByMessageIdAndRecipientId(messageId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Message not found or access denied"));
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Message not found"));
 
-        messageRecipient.setDeleted(true);
-        messageRecipient.setDeletedAt(LocalDateTime.now());
-        messageRecipientRepository.save(messageRecipient);
+        boolean isSender = message.getSender().getId().equals(userId);
 
-        log.info("Message {} deleted by user {}", messageId, userId);
+        // Znajdź MessageRecipient dla tego użytkownika
+        Optional<MessageRecipient> messageRecipientOpt = messageRecipientRepository
+                .findByMessageIdAndRecipientId(messageId, userId);
+
+        if (!isSender && messageRecipientOpt.isEmpty()) {
+            throw new IllegalArgumentException("Access denied");
+        }
+
+        if (messageRecipientOpt.isPresent()) {
+            // Użytkownik jest odbiorcą - oznacz jako usunięte dla niego
+            MessageRecipient messageRecipient = messageRecipientOpt.get();
+            messageRecipient.setDeleted(true);
+            messageRecipient.setDeletedAt(LocalDateTime.now());
+            messageRecipientRepository.save(messageRecipient);
+        }
+
+        // Jeśli nadawca usuwa wiadomość, usuń dla wszystkich odbiorców
+        if (isSender) {
+            List<MessageRecipient> allRecipients = messageRecipientRepository.findByMessageId(messageId);
+            for (MessageRecipient mr : allRecipients) {
+                mr.setDeleted(true);
+                mr.setDeletedAt(LocalDateTime.now());
+            }
+            messageRecipientRepository.saveAll(allRecipients);
+        }
+
+        log.info("Message {} deleted by user {} (sender: {})", messageId, userId, isSender);
     }
 
     /**
@@ -282,8 +312,8 @@ public class MessageService {
                 .senderId(message.getSender().getId())
                 .senderUsername(message.getSender().getUsername())
                 .senderPublicKey(message.getSender().getPublicKey())
-                .encryptedSubject(message.getSubjectEncrypted())
-                .encryptedContent(message.getContentEncrypted())
+                .subjectEncrypted(message.getSubjectEncrypted())
+                .contentEncrypted(message.getContentEncrypted())
                 .signature(message.getSignature())
                 .iv(message.getIv())
                 .encryptedAesKey(userRecipient != null ? userRecipient.getAesKeyEncrypted() : null)

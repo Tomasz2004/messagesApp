@@ -46,6 +46,7 @@ CREATE TABLE message_recipients (
     message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     recipient_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     aes_key_encrypted TEXT NOT NULL, -- klucz AES zaszyfrowany PUBLIC KEY odbiorcy
+    is_sender BOOLEAN DEFAULT FALSE, -- true jeśli to kopia dla nadawcy
     is_read BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMP,
     deleted BOOLEAN DEFAULT FALSE,

@@ -35,6 +35,10 @@ public class MessageRecipient {
     @Column(name = "aes_key_encrypted", nullable = false, columnDefinition = "TEXT")
     private String aesKeyEncrypted;
 
+    @Column(name = "is_sender")
+    @Builder.Default
+    private Boolean isSender = false;
+
     @Column(name = "is_read")
     @Builder.Default
     private Boolean isRead = false;

@@ -30,7 +30,7 @@ public class MessageController {
     private final MessageService messageService;
     private final SecurityUtils securityUtils;
 
-    @PostMapping("/send")
+    @PostMapping
     @Operation(summary = "Send encrypted message", description = "Sends an encrypted message to one or more recipients with optional attachments")
     public ResponseEntity<MessageResponse> sendMessage(
             HttpServletRequest httpRequest,

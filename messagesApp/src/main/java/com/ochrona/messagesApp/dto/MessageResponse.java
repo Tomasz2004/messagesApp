@@ -17,8 +17,8 @@ public class MessageResponse {
     private Long senderId;
     private String senderUsername;
     private String senderPublicKey;
-    private String encryptedSubject;
-    private String encryptedContent;
+    private String subjectEncrypted;
+    private String contentEncrypted;
     private String signature;
     private String iv;
     private String encryptedAesKey; // Klucz AES zaszyfrowany dla zalogowanego użytkownika

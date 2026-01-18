@@ -9,29 +9,22 @@ import java.util.List;
 @Data
 public class SendMessageRequest {
 
+    // Lista kluczy AES zaszyfrowanych dla każdego odbiorcy
     @NotEmpty(message = "At least one recipient is required")
-    private List<Long> recipientIds;
+    private List<RecipientKey> recipients;
 
-    @NotBlank(message = "Subject is required")
-    private String subject;
-
-    @NotBlank(message = "Content is required")
-    private String content;
-
-    // Klucz AES zaszyfrowany kluczem publicznym dla każdego odbiorcy
-    // Mapa: recipientId -> encryptedAesKey
-    private List<RecipientKey> recipientKeys;
+    // Zaszyfrowany temat (wymagany)
+    @NotBlank(message = "Encrypted subject is required")
+    private String subjectEncrypted;
 
     // Zaszyfrowana treść wiadomości (AES)
-    @NotBlank(message = "Encrypted subject is required")
-    private String encryptedSubject;
-
     @NotBlank(message = "Encrypted content is required")
-    private String encryptedContent;
+    private String contentEncrypted;
 
     @NotBlank(message = "IV is required")
     private String iv;
 
+    // Podpis cyfrowy (wymagany dla weryfikacji autentyczności)
     @NotBlank(message = "Signature is required")
     private String signature;
 
