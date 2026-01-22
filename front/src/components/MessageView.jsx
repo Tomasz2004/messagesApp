@@ -45,8 +45,13 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
       const privateKeyObj = await cryptoService.importPrivateKey(privateKey);
 
       // Odszyfruj klucz AES
-      const encryptedAESKeyBuffer = cryptoService.base64ToArrayBuffer(message.encryptedAesKey);
-      const aesKeyBytes = await cryptoService.decryptBytesWithRSA(encryptedAESKeyBuffer, privateKeyObj);
+      const encryptedAESKeyBuffer = cryptoService.base64ToArrayBuffer(
+        message.encryptedAesKey,
+      );
+      const aesKeyBytes = await cryptoService.decryptBytesWithRSA(
+        encryptedAESKeyBuffer,
+        privateKeyObj,
+      );
 
       // Import klucza AES
       const importedAesKey = await cryptoService.importAESKey(aesKeyBytes);
@@ -61,7 +66,9 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
 
       // Odszyfruj temat
       if (message.subjectEncrypted) {
-        encryptedSubjectBuffer = cryptoService.base64ToArrayBuffer(message.subjectEncrypted);
+        encryptedSubjectBuffer = cryptoService.base64ToArrayBuffer(
+          message.subjectEncrypted,
+        );
         const subject = await cryptoService.decryptWithAES(
           encryptedSubjectBuffer,
           importedAesKey,
@@ -71,7 +78,9 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
       }
 
       // Odszyfruj treść
-      encryptedContentBuffer = cryptoService.base64ToArrayBuffer(message.contentEncrypted);
+      encryptedContentBuffer = cryptoService.base64ToArrayBuffer(
+        message.contentEncrypted,
+      );
       const content = await cryptoService.decryptWithAES(
         encryptedContentBuffer,
         importedAesKey,
@@ -85,14 +94,26 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
           message.attachments.map(async (att) => {
             try {
               // Odszyfruj nazwę pliku
-              const filenameBuffer = cryptoService.base64ToArrayBuffer(att.encryptedFilename);
-              const filename = await cryptoService.decryptWithAES(filenameBuffer, importedAesKey, new Uint8Array(iv));
+              const filenameBuffer = cryptoService.base64ToArrayBuffer(
+                att.encryptedFilename,
+              );
+              const filename = await cryptoService.decryptWithAES(
+                filenameBuffer,
+                importedAesKey,
+                new Uint8Array(iv),
+              );
 
               // Odszyfruj typ MIME
               let mimeType = 'application/octet-stream';
               if (att.encryptedMimeType) {
-                const mimeBuffer = cryptoService.base64ToArrayBuffer(att.encryptedMimeType);
-                mimeType = await cryptoService.decryptWithAES(mimeBuffer, importedAesKey, new Uint8Array(iv));
+                const mimeBuffer = cryptoService.base64ToArrayBuffer(
+                  att.encryptedMimeType,
+                );
+                mimeType = await cryptoService.decryptWithAES(
+                  mimeBuffer,
+                  importedAesKey,
+                  new Uint8Array(iv),
+                );
               }
 
               return {
@@ -121,10 +142,22 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
       // Weryfikacja podpisu
       if (message.signature && message.senderPublicKey) {
         try {
-          const senderPublicKey = await cryptoService.importPublicKeyForVerifying(message.senderPublicKey);
-          const messageHash = await cryptoService.createMessageHash(encryptedSubjectBuffer, encryptedContentBuffer);
-          const signatureBuffer = cryptoService.base64ToArrayBuffer(message.signature);
-          const isValid = await cryptoService.verifySignature(signatureBuffer, messageHash, senderPublicKey);
+          const senderPublicKey =
+            await cryptoService.importPublicKeyForVerifying(
+              message.senderPublicKey,
+            );
+          const messageHash = await cryptoService.createMessageHash(
+            encryptedSubjectBuffer,
+            encryptedContentBuffer,
+          );
+          const signatureBuffer = cryptoService.base64ToArrayBuffer(
+            message.signature,
+          );
+          const isValid = await cryptoService.verifySignature(
+            signatureBuffer,
+            messageHash,
+            senderPublicKey,
+          );
           setSignatureValid(isValid);
         } catch (sigErr) {
           console.error('Signature verification error:', sigErr);
@@ -145,7 +178,9 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
     setDownloadingId(attachment.id);
     try {
       // Odszyfruj zawartość pliku
-      const encryptedContent = cryptoService.base64ToArrayBuffer(attachment.encryptedContent);
+      const encryptedContent = cryptoService.base64ToArrayBuffer(
+        attachment.encryptedContent,
+      );
       const decryptedContent = await window.crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: new Uint8Array(ivBuffer) },
         aesKey,
@@ -182,7 +217,8 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
     if (mimeType.startsWith('audio/')) return '🎵';
     if (mimeType.includes('pdf')) return '📄';
     if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return '📊';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet'))
+      return '📊';
     if (mimeType.includes('zip') || mimeType.includes('archive')) return '📦';
     return '📎';
   };
@@ -252,15 +288,25 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
               <h3>📎 Załączniki ({decryptedAttachments.length})</h3>
               <div className='attachments-list'>
                 {decryptedAttachments.map((attachment) => (
-                  <div key={attachment.id} className={`attachment-item ${attachment.error ? 'attachment-error' : ''}`}>
+                  <div
+                    key={attachment.id}
+                    className={`attachment-item ${attachment.error ? 'attachment-error' : ''}`}
+                  >
                     <div className='attachment-info'>
-                      <span className='attachment-icon'>{getFileIcon(attachment.mimeType)}</span>
-                      <span className='attachment-name' title={attachment.filename}>
-                        {attachment.filename.length > 40 
-                          ? attachment.filename.substring(0, 37) + '...' 
+                      <span className='attachment-icon'>
+                        {getFileIcon(attachment.mimeType)}
+                      </span>
+                      <span
+                        className='attachment-name'
+                        title={attachment.filename}
+                      >
+                        {attachment.filename.length > 40
+                          ? attachment.filename.substring(0, 37) + '...'
                           : attachment.filename}
                       </span>
-                      <span className='attachment-size'>{formatFileSize(attachment.sizeBytes)}</span>
+                      <span className='attachment-size'>
+                        {formatFileSize(attachment.sizeBytes)}
+                      </span>
                     </div>
                     {!attachment.error && (
                       <button

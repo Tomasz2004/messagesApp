@@ -9,7 +9,7 @@ CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL, -- Argon2id/bcrypt
+    password_hash VARCHAR(255) NOT NULL,
     salt VARCHAR(64) NOT NULL,
     public_key TEXT NOT NULL, -- RSA public key (PEM format)
     private_key_encrypted TEXT NOT NULL, -- RSA private key zaszyfrowany AES

@@ -59,7 +59,10 @@ const SendMessage = ({ onClose }) => {
     const maxFileSize = 10 * 1024 * 1024; // 10MB limit per file
     const maxTotalSize = 25 * 1024 * 1024; // 25MB total limit
 
-    const currentTotalSize = attachments.reduce((sum, att) => sum + att.size, 0);
+    const currentTotalSize = attachments.reduce(
+      (sum, att) => sum + att.size,
+      0,
+    );
     let newTotalSize = currentTotalSize;
 
     const validFiles = files.filter((file) => {
@@ -84,7 +87,7 @@ const SendMessage = ({ onClose }) => {
     }));
 
     setAttachments((prev) => [...prev, ...newAttachments]);
-    
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -154,7 +157,7 @@ const SendMessage = ({ onClose }) => {
       const encryptedAttachments = await Promise.all(
         attachments.map(async (attachment) => {
           const fileData = await readFileAsArrayBuffer(attachment.file);
-          
+
           // Zaszyfruj zawartość pliku
           const encryptedFileContent = await window.crypto.subtle.encrypt(
             { name: 'AES-GCM', iv: iv },
@@ -177,9 +180,13 @@ const SendMessage = ({ onClose }) => {
           );
 
           return {
-            encryptedFilename: cryptoService.arrayBufferToBase64(encryptedFilename),
-            encryptedMimeType: cryptoService.arrayBufferToBase64(encryptedMimeType),
-            encryptedContent: cryptoService.arrayBufferToBase64(new Uint8Array(encryptedFileContent)),
+            encryptedFilename:
+              cryptoService.arrayBufferToBase64(encryptedFilename),
+            encryptedMimeType:
+              cryptoService.arrayBufferToBase64(encryptedMimeType),
+            encryptedContent: cryptoService.arrayBufferToBase64(
+              new Uint8Array(encryptedFileContent),
+            ),
             sizeBytes: attachment.size,
           };
         }),
@@ -263,7 +270,8 @@ const SendMessage = ({ onClose }) => {
         contentEncrypted: cryptoService.arrayBufferToBase64(encryptedContent),
         iv: cryptoService.arrayBufferToBase64(iv),
         signature: cryptoService.arrayBufferToBase64(signature),
-        attachments: encryptedAttachments.length > 0 ? encryptedAttachments : null,
+        attachments:
+          encryptedAttachments.length > 0 ? encryptedAttachments : null,
       };
 
       console.log('Sending message data:', messageData);
@@ -348,7 +356,7 @@ const SendMessage = ({ onClose }) => {
         {/* Sekcja załączników */}
         <div className='form-group attachments-group'>
           <label>📎 Załączniki:</label>
-          
+
           <div className='attachments-upload'>
             <input
               type='file'
@@ -369,26 +377,48 @@ const SendMessage = ({ onClose }) => {
           {attachments.length > 0 && (
             <div className='attachments-list-send'>
               <div className='attachments-header'>
-                <span>{attachments.length} {attachments.length === 1 ? 'plik' : 'plików'}</span>
-                <span className='total-size'>Łącznie: {formatFileSize(attachments.reduce((sum, att) => sum + att.size, 0))}</span>
+                <span>
+                  {attachments.length}{' '}
+                  {attachments.length === 1 ? 'plik' : 'plików'}
+                </span>
+                <span className='total-size'>
+                  Łącznie:{' '}
+                  {formatFileSize(
+                    attachments.reduce((sum, att) => sum + att.size, 0),
+                  )}
+                </span>
               </div>
               {attachments.map((att) => (
                 <div key={att.id} className='attachment-item-send'>
                   <div className='attachment-info'>
                     <span className='attachment-icon'>
-                      {att.type.startsWith('image/') ? '🖼️' : 
-                       att.type.startsWith('video/') ? '🎬' :
-                       att.type.startsWith('audio/') ? '🎵' :
-                       att.type.includes('pdf') ? '📄' :
-                       att.type.includes('word') || att.type.includes('document') ? '📝' :
-                       att.type.includes('excel') || att.type.includes('spreadsheet') ? '📊' :
-                       att.type.includes('zip') || att.type.includes('archive') ? '📦' :
-                       '📎'}
+                      {att.type.startsWith('image/')
+                        ? '🖼️'
+                        : att.type.startsWith('video/')
+                          ? '🎬'
+                          : att.type.startsWith('audio/')
+                            ? '🎵'
+                            : att.type.includes('pdf')
+                              ? '📄'
+                              : att.type.includes('word') ||
+                                  att.type.includes('document')
+                                ? '📝'
+                                : att.type.includes('excel') ||
+                                    att.type.includes('spreadsheet')
+                                  ? '📊'
+                                  : att.type.includes('zip') ||
+                                      att.type.includes('archive')
+                                    ? '📦'
+                                    : '📎'}
                     </span>
                     <span className='attachment-name' title={att.name}>
-                      {att.name.length > 30 ? att.name.substring(0, 27) + '...' : att.name}
+                      {att.name.length > 30
+                        ? att.name.substring(0, 27) + '...'
+                        : att.name}
                     </span>
-                    <span className='attachment-size'>{formatFileSize(att.size)}</span>
+                    <span className='attachment-size'>
+                      {formatFileSize(att.size)}
+                    </span>
                   </div>
                   <button
                     type='button'
@@ -413,7 +443,11 @@ const SendMessage = ({ onClose }) => {
                 Wysyłanie...
               </>
             ) : (
-              <>📤 Wyślij{attachments.length > 0 && ` (+${attachments.length} załączników)`}</>
+              <>
+                📤 Wyślij
+                {attachments.length > 0 &&
+                  ` (+${attachments.length} załączników)`}
+              </>
             )}
           </button>
           <button
