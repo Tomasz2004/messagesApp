@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import cryptoService from '../services/cryptoService';
@@ -7,6 +7,7 @@ import './Login.css';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [formData, setFormData] = useState({
     username: '',
@@ -14,8 +15,18 @@ const Login = () => {
     totpCode: '',
   });
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [totpRequired, setTotpRequired] = useState(false);
+
+  // Sprawdź czy jest wiadomość z rejestracji
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Wyczyść state z historii
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleChange = (e) => {
     setFormData({
@@ -101,6 +112,7 @@ const Login = () => {
         <h1>🔐 Secure Messages</h1>
         <h2>Zaloguj się</h2>
 
+        {successMessage && <div className='success-message'>{successMessage}</div>}
         {error && <div className='error-message'>{error}</div>}
 
         <form onSubmit={handleSubmit}>

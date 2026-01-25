@@ -49,6 +49,7 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  getTotpSetup: () => api.get('/auth/totp/setup'),
   enableTotp: (totpCode) => api.post('/auth/totp/enable', { totpCode }),
   disableTotp: () => api.post('/auth/totp/disable'),
 };

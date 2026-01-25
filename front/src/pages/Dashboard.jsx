@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { messageAPI, userAPI, authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { QRCodeSVG } from 'qrcode.react';
 import SendMessage from '../components/SendMessage';
 import MessageList from '../components/MessageList';
 import './Dashboard.css';
@@ -13,8 +14,10 @@ const Dashboard = () => {
   const [showSendMessage, setShowSendMessage] = useState(false);
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [showTotpModal, setShowTotpModal] = useState(false);
+  const [totpSetup, setTotpSetup] = useState(null); // QR code i secret
   const [totpCode, setTotpCode] = useState('');
   const [error, setError] = useState('');
+  const [loadingTotp, setLoadingTotp] = useState(false);
 
   useEffect(() => {
     fetchUserInfo();
@@ -34,6 +37,21 @@ const Dashboard = () => {
     navigate('/login');
   };
 
+  const handleOpenTotpSetup = async () => {
+    setLoadingTotp(true);
+    setError('');
+    try {
+      const response = await authAPI.getTotpSetup();
+      setTotpSetup(response.data);
+      setShowTotpModal(true);
+    } catch (err) {
+      setError('Błąd podczas pobierania kodu QR');
+      console.error('Error fetching TOTP setup:', err);
+    } finally {
+      setLoadingTotp(false);
+    }
+  };
+
   const handleEnableTotp = async () => {
     if (!totpCode || totpCode.length !== 6) {
       setError('Wprowadź 6-cyfrowy kod z aplikacji Authenticator');
@@ -44,12 +62,20 @@ const Dashboard = () => {
       await authAPI.enableTotp(totpCode);
       setTotpEnabled(true);
       setShowTotpModal(false);
+      setTotpSetup(null);
       setTotpCode('');
       setError('');
       alert('2FA włączone pomyślnie!');
     } catch (err) {
       setError(err.response?.data?.message || 'Błąd podczas włączania 2FA');
     }
+  };
+
+  const handleCloseTotpModal = () => {
+    setShowTotpModal(false);
+    setTotpSetup(null);
+    setTotpCode('');
+    setError('');
   };
 
   const handleDisableTotp = async () => {
@@ -137,10 +163,11 @@ const Dashboard = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setShowTotpModal(true)}
+                    onClick={handleOpenTotpSetup}
                     className='btn-primary-small'
+                    disabled={loadingTotp}
                   >
-                    Włącz
+                    {loadingTotp ? '...' : 'Włącz'}
                   </button>
                 )}
               </div>
@@ -161,30 +188,46 @@ const Dashboard = () => {
       </div>
 
       {/* Modal do włączania TOTP */}
-      {showTotpModal && (
-        <div className='modal-overlay' onClick={() => setShowTotpModal(false)}>
-          <div className='modal-content' onClick={(e) => e.stopPropagation()}>
+      {showTotpModal && totpSetup && (
+        <div className='modal-overlay' onClick={handleCloseTotpModal}>
+          <div className='modal-content totp-setup-modal' onClick={(e) => e.stopPropagation()}>
             <h2>Włącz 2FA</h2>
-            <p>
-              Wprowadź aktualny kod 6-cyfrowy z aplikacji Google Authenticator
-              (użyj kodu QR z rejestracji):
-            </p>
-            {error && <div className='error-message'>{error}</div>}
-            <input
-              type='text'
-              value={totpCode}
-              onChange={(e) => setTotpCode(e.target.value)}
-              placeholder='123456'
-              maxLength='6'
-              pattern='[0-9]{6}'
-              className='totp-input'
-            />
+            
+            <div className='totp-setup-section'>
+              <p>1. Zeskanuj poniższy kod QR w aplikacji Google Authenticator:</p>
+              <div className='qr-code'>
+                <QRCodeSVG
+                  value={totpSetup.totpQrCode}
+                  size={180}
+                  level='H'
+                />
+              </div>
+              
+              <div className='totp-secret'>
+                <p>Lub wprowadź kod ręcznie:</p>
+                <code>{totpSetup.totpSecret}</code>
+              </div>
+            </div>
+
+            <div className='totp-verify-section'>
+              <p>2. Wprowadź 6-cyfrowy kod z aplikacji:</p>
+              {error && <div className='error-message'>{error}</div>}
+              <input
+                type='text'
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                placeholder='123456'
+                maxLength='6'
+                className='totp-input'
+              />
+            </div>
+
             <div className='modal-actions'>
               <button onClick={handleEnableTotp} className='btn-primary'>
-                Włącz
+                Włącz 2FA
               </button>
               <button
-                onClick={() => setShowTotpModal(false)}
+                onClick={handleCloseTotpModal}
                 className='btn-secondary'
               >
                 Anuluj

@@ -199,6 +199,21 @@ public class UserService {
     }
 
     /**
+     * Pobranie danych do konfiguracji TOTP (QR kod i sekret)
+     */
+    public com.ochrona.messagesApp.dto.TotpSetupResponse getTotpSetup(Long userId) throws Exception {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        String qrCode = totpService.generateQRCode(user.getTotpSecret(), user.getUsername());
+
+        return com.ochrona.messagesApp.dto.TotpSetupResponse.builder()
+                .totpSecret(user.getTotpSecret())
+                .totpQrCode(qrCode)
+                .build();
+    }
+
+    /**
      * Pobranie wszystkich użytkowników (do wyszukiwania odbiorców)
      */
     public List<User> getAllUsers() {

@@ -1,6 +1,7 @@
 package com.ochrona.messagesApp.controller;
 
 import com.ochrona.messagesApp.dto.*;
+import com.ochrona.messagesApp.dto.TotpSetupResponse;
 import com.ochrona.messagesApp.security.SecurityUtils;
 import com.ochrona.messagesApp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,9 +69,23 @@ public class AuthController {
         }
     }
 
+    @GetMapping("/totp/setup")
+    @Operation(summary = "Get TOTP setup info", description = "Returns QR code and secret for setting up TOTP 2FA. " +
+            "Scan the QR code with Google Authenticator or similar app.")
+    public ResponseEntity<TotpSetupResponse> getTotpSetup(HttpServletRequest request) {
+        try {
+            Long userId = securityUtils.getCurrentUserId(request);
+            TotpSetupResponse response = userService.getTotpSetup(userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("TOTP setup error", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PostMapping("/totp/enable")
     @Operation(summary = "Enable TOTP 2FA", description = "Enables TOTP two-factor authentication for the user. " +
-            "IMPORTANT: Before calling this endpoint, scan the QR code from registration response " +
+            "IMPORTANT: Before calling this endpoint, scan the QR code from /totp/setup " +
             "in Google Authenticator (or similar app). Then provide the current 6-digit code from " +
             "the app to verify that 2FA is properly configured. This prevents account lockout.")
     public ResponseEntity<String> enableTOTP(
