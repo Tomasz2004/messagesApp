@@ -1,6 +1,7 @@
 package com.ochrona.messagesApp.config;
 
 import com.ochrona.messagesApp.security.JWTAuthenticationFilter;
+import com.ochrona.messagesApp.security.RateLimitingFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +31,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JWTAuthenticationFilter jwtAuthenticationFilter;
+    private final RateLimitingFilter rateLimitingFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -49,6 +51,8 @@ public class SecurityConfig {
                                                                                                              // sesja
                                                                                                              // dla JWT
                 )
+                // Rate Limiting jako pierwszy filtr (przed autentykacją)
+                .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .headers(headers -> headers
                         .xssProtection(xss -> xss.disable())

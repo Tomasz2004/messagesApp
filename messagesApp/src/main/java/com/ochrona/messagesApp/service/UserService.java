@@ -110,21 +110,24 @@ public class UserService {
      */
     @Transactional
     public LoginResponse login(LoginRequest request) throws Exception {
-        // Pobranie użytkownika
+        // Pobranie użytkownika - celowo ten sam komunikat dla obu przypadków
+        // (bezpieczeństwo)
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new IllegalArgumentException("Nieprawidłowa nazwa użytkownika lub hasło."));
 
         // Sprawdzenie czy konto nie jest zablokowane
         if (user.getAccountLockedUntil() != null &&
                 user.getAccountLockedUntil().isAfter(LocalDateTime.now())) {
+            long minutesLeft = java.time.Duration.between(LocalDateTime.now(), user.getAccountLockedUntil()).toMinutes()
+                    + 1;
             throw new IllegalArgumentException(
-                    "Account is locked due to multiple failed login attempts. Try again later.");
+                    "Konto zostało tymczasowo zablokowane. Spróbuj ponownie za " + minutesLeft + " min.");
         }
 
         // Weryfikacja hasła
         if (!cryptoService.verifyPassword(request.getPassword(), user.getPasswordHash(), user.getSalt())) {
             handleFailedLogin(user);
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new IllegalArgumentException("Nieprawidłowa nazwa użytkownika lub hasło.");
         }
 
         // Weryfikacja TOTP jeśli włączone
@@ -132,13 +135,13 @@ public class UserService {
             if (request.getTotpCode() == null || request.getTotpCode().isEmpty()) {
                 return LoginResponse.builder()
                         .totpRequired(true)
-                        .message("TOTP code required")
+                        .message("Wymagany kod 2FA")
                         .build();
             }
 
             if (!totpService.verifyCode(user.getTotpSecret(), request.getTotpCode())) {
                 handleFailedLogin(user);
-                throw new IllegalArgumentException("Invalid TOTP code");
+                throw new IllegalArgumentException("Nieprawidłowy kod 2FA.");
             }
         }
 

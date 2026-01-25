@@ -18,6 +18,8 @@ const Login = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [totpRequired, setTotpRequired] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState(null); // Blokada po rate limit
+  const [lockCountdown, setLockCountdown] = useState(0); // Odliczanie
 
   // Sprawdź czy jest wiadomość z rejestracji
   useEffect(() => {
@@ -27,6 +29,24 @@ const Login = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location]);
+
+  // Timer odliczania blokady
+  useEffect(() => {
+    if (!lockedUntil) return;
+
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((lockedUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLockedUntil(null);
+        setLockCountdown(0);
+        setError('');
+      } else {
+        setLockCountdown(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
 
   const handleChange = (e) => {
     setFormData({
@@ -38,6 +58,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Sprawdź czy nie ma aktywnej blokady
+    if (lockedUntil && Date.now() < lockedUntil) {
+      return; // Nie wysyłaj requestu
+    }
+
     setError('');
     setLoading(true);
 
@@ -87,8 +113,22 @@ const Login = () => {
       navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
-      const errorMessage =
-        err.response?.data?.message || 'Błąd logowania. Sprawdź dane.';
+
+      let errorMessage;
+      if (err.response?.status === 429) {
+        // Rate limit przekroczony - ustaw blokadę lokalną
+        const retryAfter = err.response?.data?.retryAfter || 60;
+        const lockTime = Date.now() + retryAfter * 1000;
+        setLockedUntil(lockTime);
+        setLockCountdown(retryAfter);
+        errorMessage = `Zbyt wiele prób logowania. Spróbuj ponownie za ${retryAfter} sekund.`;
+      } else if (err.response?.status === 401) {
+        // Nieprawidłowe dane logowania
+        errorMessage = 'Nieprawidłowa nazwa użytkownika lub hasło.';
+      } else {
+        errorMessage =
+          err.response?.data?.message || 'Wystąpił błąd. Spróbuj ponownie.';
+      }
       setError(errorMessage);
 
       // Jeśli był błąd TOTP (ale użytkownik/hasło poprawne), zostaw panel 2FA
@@ -117,7 +157,13 @@ const Login = () => {
         {successMessage && (
           <div className='success-message'>{successMessage}</div>
         )}
-        {error && <div className='error-message'>{error}</div>}
+        {error && (
+          <div className='error-message'>
+            {lockCountdown > 0
+              ? `Zbyt wiele prób logowania. Spróbuj ponownie za ${lockCountdown} s.`
+              : error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className='form-group'>
@@ -168,8 +214,16 @@ const Login = () => {
             </div>
           )}
 
-          <button type='submit' className='btn-primary' disabled={loading}>
-            {loading ? 'Logowanie...' : 'Zaloguj się'}
+          <button
+            type='submit'
+            className='btn-primary'
+            disabled={loading || lockCountdown > 0}
+          >
+            {loading
+              ? 'Logowanie...'
+              : lockCountdown > 0
+                ? `Zablokowane (${lockCountdown}s)`
+                : 'Zaloguj się'}
           </button>
         </form>
 

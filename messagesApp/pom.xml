@@ -89,6 +89,13 @@
 			<version>1.7.1</version>
 		</dependency>
 
+		<!-- Rate Limiting - Bucket4j -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-core</artifactId>
+			<version>8.10.1</version>
+		</dependency>
+
 		<!-- Apache Commons Codec dla Base64 -->
 		<dependency>
 			<groupId>commons-codec</groupId>
