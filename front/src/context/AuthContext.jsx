@@ -3,20 +3,43 @@
  *
  * Bezpieczeństwo:
  * - Token JWT jest przechowywany w HttpOnly cookie (ustawiany przez backend)
- * - Wrażliwe dane (klucz prywatny) są w sessionStorage (kasowane po zamknięciu przeglądarki)
- * - Hasło jest szyfrowane kluczem sesyjnym przed zapisem do sessionStorage
- * - Klucz sesyjny jest tylko w pamięci (React ref) - znika po odświeżeniu strony
+ * - W sessionStorage przechowywany jest ZASZYFROWANY klucz prywatny oraz klucz szyfrujący go
+ *   (klucz szyfrujący jest generowany losowo dla sesji).
+ * - Pozwala to na odnowienie stanu po odświeżeniu strony bez trzymania plaintext klucza prywatnego w storage.
+ * - Brak plaintext klucza prywatnego w sessionStorage.
  */
-import { createContext, useState, useContext, useEffect, useRef } from 'react';
-import { authAPI } from '../services/api';
+import { createContext, useState, useContext, useEffect } from 'react';
+import { authAPI, userAPI } from '../services/api';
 
 const AuthContext = createContext(null);
 
 /**
- * Generuje losowy klucz AES-256 do szyfrowania wrażliwych danych w sesji
+ * Generuje losowy klucz AES-256
  */
 const generateSessionKey = async () => {
   return await window.crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt'],
+  );
+};
+
+/**
+ * Eksportuje klucz sesyjny do JWK (JSON)
+ */
+const exportSessionKey = async (key) => {
+  const exported = await window.crypto.subtle.exportKey('jwk', key);
+  return JSON.stringify(exported);
+};
+
+/**
+ * Importuje klucz sesyjny z JWK (JSON)
+ */
+const importSessionKey = async (jwkString) => {
+  const jwk = JSON.parse(jwkString);
+  return await window.crypto.subtle.importKey(
+    'jwk',
+    jwk,
     { name: 'AES-GCM', length: 256 },
     true,
     ['encrypt', 'decrypt'],
@@ -62,86 +85,73 @@ export const AuthProvider = ({ children }) => {
   const [privateKey, setPrivateKey] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Klucz sesyjny przechowywany tylko w pamięci (nie w storage!)
-  // useRef - nie powoduje re-renderów i zachowuje wartość między renderami
-  const sessionKeyRef = useRef(null);
-
   useEffect(() => {
-    // Wczytaj dane z sessionStorage przy montowaniu
-    const storedUser = sessionStorage.getItem('user');
-    const storedPrivateKey = sessionStorage.getItem('privateKey');
+    const initAuth = async () => {
+      try {
+        // Pobierz dane użytkownika z serwera (Single Source of Truth)
+        // Jeśli cookie sesyjne (HttpOnly) jest ważne, to zadziała
+        const response = await userAPI.getCurrentUser();
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
-      if (storedPrivateKey) {
-        setPrivateKey(storedPrivateKey);
+        setUser(response.data);
+        setIsAuthenticated(true);
+
+        // Próba odtworzenia klucza prywatnego z bezpiecznego storage sesji
+        const storedEncKey = sessionStorage.getItem('p_enc'); // Encrypted Private Key
+        const storedSKey = sessionStorage.getItem('s_k'); // Session Key (JWK)
+
+        if (storedEncKey && storedSKey) {
+          try {
+            const sessionKey = await importSessionKey(storedSKey);
+            const keyPEM = await decryptWithSessionKey(
+              storedEncKey,
+              sessionKey,
+            );
+            setPrivateKey(keyPEM);
+          } catch (e) {
+            console.error('Failed to restore private key from session', e);
+          }
+        }
+      } catch (error) {
+        // Błąd autoryzacji lub sieci - użytkownik niezalogowany
+        setIsAuthenticated(false);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
-  /**
-   * Szyfruje i zapisuje hasło do sessionStorage
-   */
-  const saveEncryptedPassword = async (
-    password,
-    encryptedPrivateKey,
-    keyDerivationSalt,
-  ) => {
-    // Wygeneruj nowy klucz sesyjny
-    const sessionKey = await generateSessionKey();
-    sessionKeyRef.current = sessionKey;
-
-    // Zaszyfruj hasło kluczem sesyjnym
-    const encryptedPassword = await encryptWithSessionKey(password, sessionKey);
-
-    // Zapisz zaszyfrowane dane
-    sessionStorage.setItem('encryptedSessionPassword', encryptedPassword);
-    sessionStorage.setItem('encryptedPrivateKey', encryptedPrivateKey);
-    sessionStorage.setItem('keyDerivationSalt', keyDerivationSalt);
-  };
-
-  /**
-   * Pobiera odszyfrowane hasło (jeśli klucz sesyjny jest dostępny)
-   */
-  const getDecryptedPassword = async () => {
-    if (!sessionKeyRef.current) {
-      return null; // Klucz sesyjny nie istnieje (np. po odświeżeniu strony)
-    }
-
-    const encryptedPassword = sessionStorage.getItem(
-      'encryptedSessionPassword',
-    );
-    if (!encryptedPassword) {
-      return null;
-    }
-
-    try {
-      return await decryptWithSessionKey(
-        encryptedPassword,
-        sessionKeyRef.current,
-      );
-    } catch (err) {
-      console.error('Failed to decrypt password:', err);
-      return null;
-    }
-  };
-
-  const login = (token, userData, privateKeyPEM) => {
+  const login = async (token, userData, privateKeyPEM) => {
     // Token JWT jest ustawiany jako HttpOnly cookie przez backend
     setUser(userData);
     setPrivateKey(privateKeyPEM);
     setIsAuthenticated(true);
 
-    // Dane użytkownika w sessionStorage
-    sessionStorage.setItem('user', JSON.stringify(userData));
+    // Bezpieczniejsze przetrzymywanie klucza prywatnego w sessionStorage
+
+    // Bezpieczniejsze przetrzymywanie klucza prywatnego w sessionStorage
     if (privateKeyPEM) {
-      sessionStorage.setItem('privateKey', privateKeyPEM);
-    }
-    // Token jako fallback
-    if (token) {
-      sessionStorage.setItem('token', token);
+      try {
+        const sessionKey = await generateSessionKey();
+        const encryptedKey = await encryptWithSessionKey(
+          privateKeyPEM,
+          sessionKey,
+        );
+        const exportedSKey = await exportSessionKey(sessionKey);
+
+        sessionStorage.setItem('p_enc', encryptedKey);
+        sessionStorage.setItem('s_k', exportedSKey);
+
+        // Upewniamy się, że nie ma starego śmiecia
+        sessionStorage.removeItem('privateKey');
+        sessionStorage.removeItem('encryptedSessionPassword');
+        sessionStorage.removeItem('encryptedPrivateKey');
+        sessionStorage.removeItem('keyDerivationSalt');
+      } catch (e) {
+        console.error('Failed to secure private key in session', e);
+      }
     }
   };
 
@@ -152,19 +162,11 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout error:', err);
     }
 
-    // Wyczyść klucz sesyjny z pamięci
-    sessionKeyRef.current = null;
-
     // Wyczyść stan i sessionStorage
     setUser(null);
     setPrivateKey(null);
     setIsAuthenticated(false);
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    sessionStorage.removeItem('privateKey');
-    sessionStorage.removeItem('encryptedSessionPassword');
-    sessionStorage.removeItem('encryptedPrivateKey');
-    sessionStorage.removeItem('keyDerivationSalt');
+    sessionStorage.clear();
   };
 
   const value = {
@@ -174,8 +176,6 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAuthenticated,
     loading,
-    saveEncryptedPassword,
-    getDecryptedPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

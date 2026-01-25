@@ -8,7 +8,7 @@ import './Login.css';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, saveEncryptedPassword } = useAuth();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -90,16 +90,8 @@ const Login = () => {
         data.keyDerivationSalt,
       );
 
-      // Zaszyfruj i zapisz hasło kluczem sesyjnym (klucz tylko w pamięci)
-      // Hasło w sessionStorage będzie zaszyfrowane - nie widoczne jako plaintext
-      await saveEncryptedPassword(
-        formData.password,
-        data.encryptedPrivateKey,
-        data.keyDerivationSalt,
-      );
-
-      // Zapisz dane użytkownika (token JWT jest w HttpOnly cookie)
-      login(
+      // Zapisz dane użytkownika i klucze sesyjnie
+      await login(
         data.token,
         {
           id: data.userId,

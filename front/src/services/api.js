@@ -12,20 +12,6 @@ const api = axios.create({
   withCredentials: true, // Wysyłaj cookies z każdym żądaniem (dla HttpOnly JWT cookie)
 });
 
-// Request interceptor - fallback dla tokena z sessionStorage (jeśli cookie nie działa)
-api.interceptors.request.use(
-  (config) => {
-    // Token jest teraz przechowywany w HttpOnly cookie, więc nie musimy go dodawać
-    // Ten kod to fallback dla kompatybilności wstecznej
-    const token = sessionStorage.getItem('token');
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
-
 // Response interceptor - obsługa błędów autoryzacji
 api.interceptors.response.use(
   (response) => response,
@@ -38,7 +24,6 @@ api.interceptors.response.use(
 
       if (!isAuthEndpoint) {
         // Token wygasł lub jest nieprawidłowy - wyczyść sessionStorage
-        sessionStorage.removeItem('token');
         sessionStorage.removeItem('user');
         sessionStorage.removeItem('privateKey');
         sessionStorage.removeItem('encryptedSessionPassword');
