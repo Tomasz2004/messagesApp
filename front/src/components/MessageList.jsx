@@ -56,6 +56,7 @@ const MessageList = ({ type }) => {
     if (window.confirm('Czy na pewno chcesz usunąć tę wiadomość?')) {
       try {
         await messageAPI.deleteMessage(messageId);
+        setSelectedMessage(null); // Wróć do listy wiadomości
         fetchMessages();
       } catch (err) {
         alert('Błąd podczas usuwania wiadomości');
@@ -66,10 +67,16 @@ const MessageList = ({ type }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffTime = now - date;
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) {
+    if (diffMinutes < 1) {
+      return 'Przed chwilą';
+    } else if (diffMinutes < 60) {
+      return `${diffMinutes} min temu`;
+    } else if (diffHours < 24) {
       return date.toLocaleTimeString('pl-PL', {
         hour: '2-digit',
         minute: '2-digit',
