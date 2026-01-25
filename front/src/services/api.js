@@ -1,5 +1,5 @@
-// API configuration
-const API_BASE_URL = 'http://localhost:8080/api';
+// API configuration - używa zmiennej środowiskowej lub domyślnie /api dla Dockera
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Axios instance
 import axios from 'axios';

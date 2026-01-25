@@ -1,0 +1,75 @@
+# ===== Sekrety i dane wrażliwe =====
+.env
+.env.local
+.env.production
+*.env
+
+# ===== Certyfikaty SSL =====
+nginx/certs/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# ===== Node.js (Frontend) =====
+front/node_modules/
+front/dist/
+front/.vite/
+front/*.local
+
+# ===== Java/Maven (Backend) =====
+messagesApp/target/
+messagesApp/*.jar
+messagesApp/*.war
+messagesApp/.mvn/wrapper/maven-wrapper.jar
+
+# ===== IDE i edytory =====
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+
+# ===== System operacyjny =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Logi =====
+*.log
+logs/
+**/logs/
+
+# ===== Baza danych lokalna =====
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+
+# ===== Docker (opcjonalne lokalne dane) =====
+# Volumes są zarządzane przez Docker, ale na wszelki wypadek
+docker-data/
+
+# ===== Pliki tymczasowe =====
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+
+# ===== Test coverage =====
+coverage/
+*.lcov
+.nyc_output/
+
+# ===== Inne =====
+*.class
+*.pyc
+__pycache__/

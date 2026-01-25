@@ -1,0 +1,83 @@
+services:
+  # ===== PostgreSQL Database =====
+  postgres:
+    image: postgres:16-alpine
+    container_name: messages-db
+    environment:
+      POSTGRES_DB: messagesDB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./baza.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d messagesDB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # ===== Spring Boot Backend =====
+  backend:
+    build:
+      context: ./messagesApp
+      dockerfile: Dockerfile
+    container_name: messages-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/messagesDB
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      # JWT secret (w produkcji użyj secrets)
+      JWT_SECRET: ${JWT_SECRET:-verySecretKeyForJWTTokenGenerationThatShouldBeAtLeast256BitsLong}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    # Nie eksponuj portu bezpośrednio - tylko przez NGINX
+    expose:
+      - '8080'
+
+  # ===== React Frontend =====
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: messages-frontend
+    networks:
+      - app-network
+    restart: unless-stopped
+    expose:
+      - '80'
+
+  # ===== NGINX Reverse Proxy z SSL =====
+  nginx:
+    image: nginx:alpine
+    container_name: messages-proxy
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

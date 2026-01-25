@@ -68,10 +68,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000")); // Frontend origins
+        // Frontend origins - lokalne dev + Docker (przez NGINX proxy)
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173", // Vite dev server
+                "http://localhost:3000", // Alternative dev port
+                "http://localhost", // Docker HTTP
+                "https://localhost", // Docker HTTPS
+                "http://localhost:80",
+                "https://localhost:443"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Cookie"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

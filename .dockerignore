@@ -1,0 +1,30 @@
+# Certyfikaty SSL
+nginx/certs/
+
+# Docker volumes
+postgres_data/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+front/node_modules/
+front/dist/
+
+# Maven
+messagesApp/target/
+messagesApp/*.jar
+
+# Environment files (mogą zawierać sekrety)
+.env.local
+.env.production
