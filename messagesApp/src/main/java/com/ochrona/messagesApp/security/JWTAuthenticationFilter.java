@@ -3,6 +3,7 @@ package com.ochrona.messagesApp.security;
 import com.ochrona.messagesApp.service.JWTService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,8 @@ import java.util.ArrayList;
 
 /**
  * Filtr JWT do walidacji tokenów w każdym żądaniu
+ * Obsługuje token z HttpOnly cookie (preferowany) lub nagłówka Authorization
+ * (fallback)
  */
 @Component
 @RequiredArgsConstructor
@@ -33,18 +36,24 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String username;
+        String jwt = null;
+        String username;
 
-        // Sprawdzenie czy nagłówek Authorization istnieje i zaczyna się od "Bearer "
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // 1. Najpierw sprawdź HttpOnly cookie (bezpieczniejsze)
+        jwt = getTokenFromCookie(request);
+
+        // 2. Fallback: sprawdź nagłówek Authorization (dla kompatybilności)
+        if (jwt == null) {
+            jwt = getTokenFromHeader(request);
+        }
+
+        // Jeśli nie ma tokena, kontynuuj bez autentykacji
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
-            jwt = authHeader.substring(7);
             username = jwtService.getUsernameFromToken(jwt);
 
             // Jeśli username został wyekstrahowany i nie ma już uwierzytelnienia w
@@ -81,5 +90,31 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Pobiera token JWT z HttpOnly cookie
+     */
+    private String getTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("jwt".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Pobiera token JWT z nagłówka Authorization (fallback)
+     */
+    private String getTokenFromHeader(HttpServletRequest request) {
+        final String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
     }
 }

@@ -1,12 +1,13 @@
 package com.ochrona.messagesApp.controller;
 
 import com.ochrona.messagesApp.dto.*;
-import com.ochrona.messagesApp.dto.TotpSetupResponse;
 import com.ochrona.messagesApp.security.SecurityUtils;
 import com.ochrona.messagesApp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,10 +50,24 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Login user", description = "Authenticates user with username, password and optional TOTP code")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    @Operation(summary = "Login user", description = "Authenticates user with username, password and optional TOTP code. Sets JWT as HttpOnly cookie.")
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse httpResponse) {
         try {
             LoginResponse response = userService.login(request);
+
+            // Ustaw JWT jako HttpOnly cookie (jeśli logowanie się powiodło i mamy token)
+            if (response.getToken() != null) {
+                Cookie jwtCookie = new Cookie("jwt", response.getToken());
+                jwtCookie.setHttpOnly(true); // Niedostępne dla JavaScript - ochrona przed XSS
+                jwtCookie.setSecure(false); // TODO: ustawić na true w produkcji (wymaga HTTPS)
+                jwtCookie.setPath("/"); // Dostępne dla wszystkich ścieżek
+                jwtCookie.setMaxAge(24 * 60 * 60); // 24 godziny (zgodne z JWT expiration)
+                // SameSite=Lax - ochrona przed CSRF (Spring domyślnie)
+                httpResponse.addCookie(jwtCookie);
+            }
+
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             log.error("Login failed: {}", e.getMessage());
@@ -117,5 +132,19 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to disable TOTP: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout user", description = "Clears the JWT cookie to log out the user")
+    public ResponseEntity<String> logout(HttpServletResponse httpResponse) {
+        // Usuń cookie JWT przez ustawienie maxAge na 0
+        Cookie jwtCookie = new Cookie("jwt", "");
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setSecure(false); // TODO: ustawić na true w produkcji
+        jwtCookie.setPath("/");
+        jwtCookie.setMaxAge(0); // Usuń cookie
+        httpResponse.addCookie(jwtCookie);
+
+        return ResponseEntity.ok("Logged out successfully");
     }
 }

@@ -9,13 +9,16 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Wysyłaj cookies z każdym żądaniem (dla HttpOnly JWT cookie)
 });
 
-// Request interceptor - dodaje token do każdego zapytania
+// Request interceptor - fallback dla tokena z sessionStorage (jeśli cookie nie działa)
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
+    // Token jest teraz przechowywany w HttpOnly cookie, więc nie musimy go dodawać
+    // Ten kod to fallback dla kompatybilności wstecznej
+    const token = sessionStorage.getItem('token');
+    if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -34,10 +37,13 @@ api.interceptors.response.use(
         error.config?.url?.includes('/auth/register');
 
       if (!isAuthEndpoint) {
-        // Token wygasł lub jest nieprawidłowy - tylko dla chronionych zasobów
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('privateKey');
+        // Token wygasł lub jest nieprawidłowy - wyczyść sessionStorage
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('privateKey');
+        sessionStorage.removeItem('encryptedSessionPassword');
+        sessionStorage.removeItem('encryptedPrivateKey');
+        sessionStorage.removeItem('keyDerivationSalt');
         window.location.href = '/login';
       }
     }
@@ -49,6 +55,7 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   getTotpSetup: () => api.get('/auth/totp/setup'),
   enableTotp: (totpCode) => api.post('/auth/totp/enable', { totpCode }),
   disableTotp: () => api.post('/auth/totp/disable'),

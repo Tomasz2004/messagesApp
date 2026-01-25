@@ -5,7 +5,7 @@ import cryptoService from '../services/cryptoService';
 import './SendMessage.css';
 
 const SendMessage = ({ onClose }) => {
-  const { user } = useAuth();
+  const { user, getDecryptedPassword } = useAuth();
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
     recipientIds: [],
@@ -231,13 +231,16 @@ const SendMessage = ({ onClose }) => {
         ),
       });
 
-      // Pobierz zaszyfrowany klucz prywatny użytkownika z localStorage
-      const encryptedPrivateKey = localStorage.getItem('encryptedPrivateKey');
-      const keyDerivationSalt = localStorage.getItem('keyDerivationSalt');
-      const password = localStorage.getItem('password'); // Hasło zapisane przy logowaniu
+      // Pobierz odszyfrowane hasło z AuthContext (hasło jest zaszyfrowane w sessionStorage)
+      const password = await getDecryptedPassword();
+      const encryptedPrivateKey = sessionStorage.getItem('encryptedPrivateKey');
+      const keyDerivationSalt = sessionStorage.getItem('keyDerivationSalt');
 
       if (!encryptedPrivateKey || !keyDerivationSalt || !password) {
-        throw new Error('Brak danych do utworzenia podpisu cyfrowego');
+        throw new Error(
+          'Brak danych do utworzenia podpisu cyfrowego. ' +
+            'Jeśli odświeżyłeś stronę, zaloguj się ponownie.',
+        );
       }
 
       // Odszyfruj klucz prywatny

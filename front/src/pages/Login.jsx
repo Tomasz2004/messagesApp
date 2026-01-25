@@ -8,7 +8,7 @@ import './Login.css';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, saveEncryptedPassword } = useAuth();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -64,13 +64,15 @@ const Login = () => {
         data.keyDerivationSalt,
       );
 
-      // Zapisz hasło w localStorage (do podpisywania wiadomości)
-      // UWAGA: W produkcji lepiej przechowywać w pamięci lub używać Web Crypto API
-      localStorage.setItem('password', formData.password);
-      localStorage.setItem('encryptedPrivateKey', data.encryptedPrivateKey);
-      localStorage.setItem('keyDerivationSalt', data.keyDerivationSalt);
+      // Zaszyfruj i zapisz hasło kluczem sesyjnym (klucz tylko w pamięci)
+      // Hasło w sessionStorage będzie zaszyfrowane - nie widoczne jako plaintext
+      await saveEncryptedPassword(
+        formData.password,
+        data.encryptedPrivateKey,
+        data.keyDerivationSalt,
+      );
 
-      // Zapisz dane użytkownika
+      // Zapisz dane użytkownika (token JWT jest w HttpOnly cookie)
       login(
         data.token,
         {
