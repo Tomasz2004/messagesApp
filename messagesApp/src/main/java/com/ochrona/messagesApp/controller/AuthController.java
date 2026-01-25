@@ -71,12 +71,24 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             log.error("Login failed: {}", e.getMessage());
+            // Sztuczne opóźnienie przy błędnym logowaniu - ochrona przed brute-force
+            try {
+                Thread.sleep(1000); // 1 sekunda opóźnienia
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                     LoginResponse.builder()
                             .message(e.getMessage())
                             .build());
         } catch (Exception e) {
             log.error("Login error", e);
+            // Sztuczne opóźnienie również przy innych błędach
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     LoginResponse.builder()
                             .message("Login failed: " + e.getMessage())

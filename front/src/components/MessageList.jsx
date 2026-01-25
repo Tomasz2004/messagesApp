@@ -125,7 +125,7 @@ const MessageList = ({ type }) => {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`message-item ${!message.read && type === 'inbox' ? 'unread' : ''}`}
+              className={`message-item ${!message.isRead && type === 'inbox' ? 'unread' : ''}`}
               onClick={() => handleMessageClick(message)}
             >
               <div className='message-item-header'>
@@ -143,7 +143,7 @@ const MessageList = ({ type }) => {
                   ? '🔒 Zaszyfrowany temat'
                   : 'Brak tematu'}
               </div>
-              {!message.read && type === 'inbox' && (
+              {!message.isRead && type === 'inbox' && (
                 <span className='unread-indicator'>●</span>
               )}
             </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { messageAPI } from '../services/api';
 import cryptoService from '../services/cryptoService';
 import './MessageView.css';
 
@@ -19,7 +20,15 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
 
   useEffect(() => {
     decryptMessage();
-  }, [message]);
+
+    // Oznacz wiadomość jako przeczytaną (tylko dla odebranych wiadomości)
+    if (type === 'inbox' && message?.id && !message.isRead) {
+      messageAPI
+        .markAsRead(message.id)
+        .then(() => console.log('Message marked as read'))
+        .catch((err) => console.error('Failed to mark as read:', err));
+    }
+  }, [message, type]);
 
   const decryptMessage = async () => {
     setLoading(true);

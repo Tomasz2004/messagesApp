@@ -76,6 +76,8 @@ export const messageAPI = {
   getSentMessages: () => api.get('/messages/sent'),
   getMessageById: (messageId) => api.get(`/messages/${messageId}`),
   deleteMessage: (messageId) => api.delete(`/messages/${messageId}`),
+  markAsRead: (messageId) => api.post(`/messages/${messageId}/read`),
+  getUnreadCount: () => api.get('/messages/unread/count'),
 };
 
 export default api;
