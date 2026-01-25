@@ -23,12 +23,7 @@ api.interceptors.response.use(
         error.config?.url?.includes('/auth/register');
 
       if (!isAuthEndpoint) {
-        // Token wygasł lub jest nieprawidłowy - wyczyść sessionStorage
-        sessionStorage.removeItem('user');
-        sessionStorage.removeItem('privateKey');
-        sessionStorage.removeItem('encryptedSessionPassword');
-        sessionStorage.removeItem('encryptedPrivateKey');
-        sessionStorage.removeItem('keyDerivationSalt');
+        // Token wygasł lub jest nieprawidłowy
         window.location.href = '/login';
       }
     }
@@ -44,6 +39,7 @@ export const authAPI = {
   getTotpSetup: () => api.get('/auth/totp/setup'),
   enableTotp: (totpCode) => api.post('/auth/totp/enable', { totpCode }),
   disableTotp: () => api.post('/auth/totp/disable'),
+  getPrivateKey: () => api.get('/auth/private-key'),
 };
 
 // User endpoints

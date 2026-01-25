@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { messageAPI } from '../services/api';
 import cryptoService from '../services/cryptoService';
+import PasswordModal from './PasswordModal';
 import './MessageView.css';
 
 const MessageView = ({ message, onBack, onDelete, type }) => {
@@ -13,6 +14,8 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloadingId, setDownloadingId] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [unlockedPrivateKey, setUnlockedPrivateKey] = useState(null);
 
   // Przechowaj klucz AES i IV do odszyfrowania załączników
   const [aesKey, setAesKey] = useState(null);
@@ -30,13 +33,18 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
     }
   }, [message, type]);
 
-  const decryptMessage = async () => {
+  const decryptMessage = async (keyOverride = null) => {
     setLoading(true);
     setError('');
 
+    const currentPrivateKey = keyOverride || privateKey || unlockedPrivateKey;
+
     try {
-      if (!privateKey) {
-        throw new Error('Brak klucza prywatnego - zaloguj się ponownie');
+      if (!currentPrivateKey) {
+        // Pokaż modal do wpisania hasła
+        setShowPasswordModal(true);
+        setLoading(false);
+        return;
       }
 
       console.log('Message data:', {
@@ -51,7 +59,8 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
       }
 
       // Import klucza prywatnego
-      const privateKeyObj = await cryptoService.importPrivateKey(privateKey);
+      const privateKeyObj =
+        await cryptoService.importPrivateKey(currentPrivateKey);
 
       // Odszyfruj klucz AES
       const encryptedAESKeyBuffer = cryptoService.base64ToArrayBuffer(
@@ -336,6 +345,20 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
             </div>
           )}
         </div>
+      )}
+
+      {showPasswordModal && (
+        <PasswordModal
+          onSuccess={(key) => {
+            setUnlockedPrivateKey(key);
+            setShowPasswordModal(false);
+            decryptMessage(key);
+          }}
+          onCancel={() => {
+            setShowPasswordModal(false);
+            setError('Wymagane hasło do odszyfrowania wiadomości');
+          }}
+        />
       )}
     </div>
   );

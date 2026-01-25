@@ -146,6 +146,21 @@ public class AuthController {
         }
     }
 
+    @GetMapping("/private-key")
+    @Operation(summary = "Get encrypted private key", description = "Returns the encrypted private key and salt for the current user. "
+            +
+            "Used to restore E2EE capability after page refresh by re-entering password.")
+    public ResponseEntity<PrivateKeyResponse> getPrivateKey(HttpServletRequest request) {
+        try {
+            Long userId = securityUtils.getCurrentUserId(request);
+            PrivateKeyResponse response = userService.getPrivateKeyData(userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Get private key error", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PostMapping("/logout")
     @Operation(summary = "Logout user", description = "Clears the JWT cookie to log out the user")
     public ResponseEntity<String> logout(HttpServletResponse httpResponse) {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { userAPI, messageAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import cryptoService from '../services/cryptoService';
+import PasswordModal from './PasswordModal';
 import './SendMessage.css';
 
 const SendMessage = ({ onClose }) => {
@@ -16,6 +17,8 @@ const SendMessage = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [unlockedPrivateKey, setUnlockedPrivateKey] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -231,12 +234,17 @@ const SendMessage = ({ onClose }) => {
         ),
       });
 
-      // Użyj klucza prywatnego z kontekstu (jest już odszyfrowany w pamięci)
-      if (!privateKey) {
-        throw new Error('Brak klucza prywatnego. Zaloguj się ponownie.');
+      // Użyj klucza prywatnego z kontekstu lub odblokowanego klucza
+      const currentPrivateKey = privateKey || unlockedPrivateKey;
+
+      if (!currentPrivateKey) {
+        // Pokaż modal do wpisania hasła
+        setShowPasswordModal(true);
+        setLoading(false);
+        return;
       }
 
-      const privateKeyPEM = privateKey;
+      const privateKeyPEM = currentPrivateKey;
 
       // Importuj klucz prywatny do podpisywania
       const privateKeyForSigning =
@@ -282,8 +290,29 @@ const SendMessage = ({ onClose }) => {
     }
   };
 
+  // Obsługa po odblokowaniu klucza prywatnego
+  const handlePasswordSuccess = (key) => {
+    setUnlockedPrivateKey(key);
+    setShowPasswordModal(false);
+    // Automatycznie ponów wysłanie formularza
+    const fakeEvent = { preventDefault: () => {} };
+    handleSubmit(fakeEvent);
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false);
+    setLoading(false);
+  };
+
   return (
     <div className='send-message'>
+      {showPasswordModal && (
+        <PasswordModal
+          onSuccess={handlePasswordSuccess}
+          onCancel={handlePasswordCancel}
+        />
+      )}
+
       <div className='send-message-header'>
         <h2>✉️ Nowa wiadomość</h2>
         <button onClick={onClose} className='btn-close'>

@@ -202,6 +202,20 @@ public class UserService {
     }
 
     /**
+     * Pobranie zaszyfrowanego klucza prywatnego i soli
+     * Używane do odtworzenia E2EE po odświeżeniu strony
+     */
+    public com.ochrona.messagesApp.dto.PrivateKeyResponse getPrivateKeyData(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return com.ochrona.messagesApp.dto.PrivateKeyResponse.builder()
+                .encryptedPrivateKey(user.getPrivateKeyEncrypted())
+                .keyDerivationSalt(user.getKeyDerivationSalt())
+                .build();
+    }
+
+    /**
      * Pobranie danych do konfiguracji TOTP (QR kod i sekret)
      */
     public com.ochrona.messagesApp.dto.TotpSetupResponse getTotpSetup(Long userId) throws Exception {
