@@ -20,18 +20,24 @@ const PasswordModal = ({ onSuccess, onCancel }) => {
       const response = await authAPI.getPrivateKey();
       const { encryptedPrivateKey, keyDerivationSalt } = response.data;
 
-      // Odszyfruj klucz prywatny hasłem
+      // Odszyfruj klucz prywatny hasłem (zwraca PEM string)
       const privateKeyPEM = await cryptoService.decryptPrivateKey(
         encryptedPrivateKey,
         password,
         keyDerivationSalt,
       );
 
-      // Zapisz klucz w kontekście (tylko w pamięci)
-      unlockPrivateKey(privateKeyPEM);
+      // Importuj jako dwa CryptoKey z extractable: false
+      const privateKeyDecrypt =
+        await cryptoService.importPrivateKey(privateKeyPEM);
+      const privateKeySign =
+        await cryptoService.importPrivateKeyForSigning(privateKeyPEM);
+
+      // Zapisz klucze w kontekście (tylko w pamięci)
+      unlockPrivateKey(privateKeyDecrypt, privateKeySign);
 
       // Powiadom rodzica o sukcesie
-      onSuccess(privateKeyPEM);
+      onSuccess(privateKeyDecrypt, privateKeySign);
     } catch (err) {
       console.error('Password unlock error:', err);
       setError('Nieprawidłowe hasło. Spróbuj ponownie.');

@@ -6,7 +6,7 @@ import PasswordModal from './PasswordModal';
 import './MessageView.css';
 
 const MessageView = ({ message, onBack, onDelete, type }) => {
-  const { privateKey } = useAuth();
+  const { privateKeyDecrypt } = useAuth();
   const [decryptedSubject, setDecryptedSubject] = useState('');
   const [decryptedContent, setDecryptedContent] = useState('');
   const [decryptedAttachments, setDecryptedAttachments] = useState([]);
@@ -15,7 +15,8 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
   const [error, setError] = useState('');
   const [downloadingId, setDownloadingId] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [unlockedPrivateKey, setUnlockedPrivateKey] = useState(null);
+  const [unlockedPrivateKeyDecrypt, setUnlockedPrivateKeyDecrypt] =
+    useState(null);
 
   // Przechowaj klucz AES i IV do odszyfrowania załączników
   const [aesKey, setAesKey] = useState(null);
@@ -37,7 +38,8 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
     setLoading(true);
     setError('');
 
-    const currentPrivateKey = keyOverride || privateKey || unlockedPrivateKey;
+    const currentPrivateKey =
+      keyOverride || privateKeyDecrypt || unlockedPrivateKeyDecrypt;
 
     try {
       if (!currentPrivateKey) {
@@ -58,9 +60,8 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
         throw new Error('Brak zaszyfrowanego klucza AES');
       }
 
-      // Import klucza prywatnego
-      const privateKeyObj =
-        await cryptoService.importPrivateKey(currentPrivateKey);
+      // currentPrivateKey jest już CryptoKey (importowany z extractable: false)
+      const privateKeyObj = currentPrivateKey;
 
       // Odszyfruj klucz AES
       const encryptedAESKeyBuffer = cryptoService.base64ToArrayBuffer(
@@ -349,10 +350,10 @@ const MessageView = ({ message, onBack, onDelete, type }) => {
 
       {showPasswordModal && (
         <PasswordModal
-          onSuccess={(key) => {
-            setUnlockedPrivateKey(key);
+          onSuccess={(keyDecrypt, keySign) => {
+            setUnlockedPrivateKeyDecrypt(keyDecrypt);
             setShowPasswordModal(false);
-            decryptMessage(key);
+            decryptMessage(keyDecrypt);
           }}
           onCancel={() => {
             setShowPasswordModal(false);

@@ -15,7 +15,9 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [privateKey, setPrivateKey] = useState(null);
+  // Trzymamy dwa CryptoKey: jeden do deszyfrowania (RSA-OAEP), drugi do podpisywania (RSASSA)
+  const [privateKeyDecrypt, setPrivateKeyDecrypt] = useState(null);
+  const [privateKeySign, setPrivateKeySign] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,20 +42,32 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  const login = async (token, userData, privateKeyPEM) => {
+  const login = async (
+    token,
+    userData,
+    privateKeyDecryptCryptoKey,
+    privateKeySignCryptoKey,
+  ) => {
     // Token JWT jest ustawiany jako HttpOnly cookie przez backend
     setUser(userData);
-    setPrivateKey(privateKeyPEM);
+    setPrivateKeyDecrypt(privateKeyDecryptCryptoKey);
+    setPrivateKeySign(privateKeySignCryptoKey);
     setIsAuthenticated(true);
-    // Klucz prywatny jest TYLKO w pamięci - nie zapisujemy nigdzie
+    // Klucze prywatne (CryptoKey) są TYLKO w pamięci - nie zapisujemy nigdzie
   };
 
   /**
-   * Odszyfrowuje i ustawia klucz prywatny po wpisaniu hasła
-   * Wywoływane gdy użytkownik odświeżył stronę i próbuje wysłać wiadomość
+   * Odszyfrowuje i ustawia klucze prywatne po wpisaniu hasła
+   * Wywoływane gdy użytkownik odświeżył stronę i próbuje wysłać/odczytać wiadomość
+   * @param {CryptoKey} privateKeyDecryptCryptoKey - Klucz do deszyfrowania (RSA-OAEP, extractable: false)
+   * @param {CryptoKey} privateKeySignCryptoKey - Klucz do podpisywania (RSASSA, extractable: false)
    */
-  const unlockPrivateKey = (privateKeyPEM) => {
-    setPrivateKey(privateKeyPEM);
+  const unlockPrivateKey = (
+    privateKeyDecryptCryptoKey,
+    privateKeySignCryptoKey,
+  ) => {
+    setPrivateKeyDecrypt(privateKeyDecryptCryptoKey);
+    setPrivateKeySign(privateKeySignCryptoKey);
   };
 
   const logout = async () => {
@@ -65,13 +79,15 @@ export const AuthProvider = ({ children }) => {
 
     // Wyczyść stan
     setUser(null);
-    setPrivateKey(null);
+    setPrivateKeyDecrypt(null);
+    setPrivateKeySign(null);
     setIsAuthenticated(false);
   };
 
   const value = {
     user,
-    privateKey,
+    privateKeyDecrypt,
+    privateKeySign,
     login,
     logout,
     isAuthenticated,

@@ -83,12 +83,18 @@ const Login = () => {
         return;
       }
 
-      // Odszyfruj klucz prywatny
+      // Odszyfruj klucz prywatny (zwraca PEM string)
       const privateKeyPEM = await cryptoService.decryptPrivateKey(
         data.encryptedPrivateKey,
         formData.password,
         data.keyDerivationSalt,
       );
+
+      // Importuj jako dwa CryptoKey z extractable: false
+      const privateKeyDecrypt =
+        await cryptoService.importPrivateKey(privateKeyPEM);
+      const privateKeySign =
+        await cryptoService.importPrivateKeyForSigning(privateKeyPEM);
 
       // Zapisz dane użytkownika i klucze sesyjnie
       await login(
@@ -99,7 +105,8 @@ const Login = () => {
           email: data.email,
           publicKey: data.publicKey,
         },
-        privateKeyPEM,
+        privateKeyDecrypt,
+        privateKeySign,
       );
 
       navigate('/dashboard');

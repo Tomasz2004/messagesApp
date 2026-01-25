@@ -6,7 +6,7 @@ import PasswordModal from './PasswordModal';
 import './SendMessage.css';
 
 const SendMessage = ({ onClose }) => {
-  const { user, privateKey } = useAuth();
+  const { user, privateKeyDecrypt, privateKeySign } = useAuth();
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({
     recipientIds: [],
@@ -18,7 +18,9 @@ const SendMessage = ({ onClose }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [unlockedPrivateKey, setUnlockedPrivateKey] = useState(null);
+  const [unlockedPrivateKeyDecrypt, setUnlockedPrivateKeyDecrypt] =
+    useState(null);
+  const [unlockedPrivateKeySign, setUnlockedPrivateKeySign] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -234,21 +236,18 @@ const SendMessage = ({ onClose }) => {
         ),
       });
 
-      // Użyj klucza prywatnego z kontekstu lub odblokowanego klucza
-      const currentPrivateKey = privateKey || unlockedPrivateKey;
+      // Użyj kluczy prywatnych z kontekstu lub odblokowanych kluczy (CryptoKey)
+      const currentPrivateKeySign = privateKeySign || unlockedPrivateKeySign;
 
-      if (!currentPrivateKey) {
+      if (!currentPrivateKeySign) {
         // Pokaż modal do wpisania hasła
         setShowPasswordModal(true);
         setLoading(false);
         return;
       }
 
-      const privateKeyPEM = currentPrivateKey;
-
-      // Importuj klucz prywatny do podpisywania
-      const privateKeyForSigning =
-        await cryptoService.importPrivateKeyForSigning(privateKeyPEM);
+      // currentPrivateKeySign jest już CryptoKey gotowym do podpisywania
+      const privateKeyForSigning = currentPrivateKeySign;
 
       // Utwórz hash wiadomości (SHA-256 z subjectEncrypted + contentEncrypted)
       const messageHash = await cryptoService.createMessageHash(
@@ -291,8 +290,9 @@ const SendMessage = ({ onClose }) => {
   };
 
   // Obsługa po odblokowaniu klucza prywatnego
-  const handlePasswordSuccess = (key) => {
-    setUnlockedPrivateKey(key);
+  const handlePasswordSuccess = (keyDecrypt, keySign) => {
+    setUnlockedPrivateKeyDecrypt(keyDecrypt);
+    setUnlockedPrivateKeySign(keySign);
     setShowPasswordModal(false);
     // Automatycznie ponów wysłanie formularza
     const fakeEvent = { preventDefault: () => {} };

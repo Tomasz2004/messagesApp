@@ -123,7 +123,7 @@ class CryptoService {
         name: 'RSA-OAEP',
         hash: 'SHA-256',
       },
-      true,
+      false,
       ['decrypt'],
     );
   }
@@ -379,7 +379,7 @@ class CryptoService {
         name: 'RSASSA-PKCS1-v1_5',
         hash: 'SHA-256',
       },
-      true,
+      false,
       ['sign'],
     );
   }
