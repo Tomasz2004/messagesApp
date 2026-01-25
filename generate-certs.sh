@@ -11,6 +11,9 @@ echo "🔐 Generowanie certyfikatu SSL dla localhost..."
 # Utwórz katalog na certyfikaty
 mkdir -p "$CERTS_DIR"
 
+# Wyłącz konwersję ścieżek w Git Bash (Windows)
+export MSYS_NO_PATHCONV=1
+
 # Generuj klucz prywatny i certyfikat
 openssl req -x509 -nodes -days $DAYS_VALID -newkey rsa:2048 \
     -keyout "$CERTS_DIR/server.key" \
