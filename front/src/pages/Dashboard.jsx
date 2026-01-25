@@ -99,13 +99,19 @@ const Dashboard = () => {
           <nav className='sidebar-nav'>
             <button
               className={`nav-item ${activeTab === 'inbox' ? 'active' : ''}`}
-              onClick={() => setActiveTab('inbox')}
+              onClick={() => {
+                setActiveTab('inbox');
+                setShowSendMessage(false);
+              }}
             >
               📥 Odebrane
             </button>
             <button
               className={`nav-item ${activeTab === 'sent' ? 'active' : ''}`}
-              onClick={() => setActiveTab('sent')}
+              onClick={() => {
+                setActiveTab('sent');
+                setShowSendMessage(false);
+              }}
             >
               📤 Wysłane
             </button>

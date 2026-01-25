@@ -10,6 +10,8 @@ const MessageList = ({ type }) => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Resetuj wybraną wiadomość przy zmianie zakładki
+    setSelectedMessage(null);
     fetchMessages();
   }, [type]);
 
