@@ -269,10 +269,6 @@ public class CryptoService {
     public PasswordStrength checkPasswordStrength(String password) {
         int score = 0;
 
-        if (password.length() >= 12)
-            score++;
-        if (password.length() >= 16)
-            score++;
         if (password.matches(".*[a-z].*"))
             score++;
         if (password.matches(".*[A-Z].*"))
@@ -282,15 +278,13 @@ public class CryptoService {
         if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*"))
             score++;
 
-        if (score <= 2)
+        if (score <= 3)
             return PasswordStrength.WEAK;
-        if (score <= 4)
-            return PasswordStrength.MEDIUM;
         return PasswordStrength.STRONG;
     }
 
     public enum PasswordStrength {
-        WEAK, MEDIUM, STRONG
+        WEAK, STRONG
     }
 
     /**

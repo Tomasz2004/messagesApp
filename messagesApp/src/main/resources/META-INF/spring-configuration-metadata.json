@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Secret key used for signing JWT tokens. Must be at least 256 bits for HS256 algorithm. Should be overridden in production using environment variable JWT_SECRET.",
+      "defaultValue": "your-very-secure-secret-key-minimum-256-bits-long-for-hs256-algorithm-change-this-in-production"
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "JWT token expiration time in milliseconds. Default is 86400000 (24 hours).",
+      "defaultValue": 86400000
+    }
+  ]
+}

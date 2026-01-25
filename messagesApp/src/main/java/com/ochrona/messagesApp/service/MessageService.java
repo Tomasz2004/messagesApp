@@ -30,7 +30,6 @@ public class MessageService {
     private final MessageRecipientRepository messageRecipientRepository;
     private final AttachmentRepository attachmentRepository;
     private final UserRepository userRepository;
-    private final CryptoService cryptoService;
 
     /**
      * Wysłanie zaszyfrowanej wiadomości
