@@ -112,7 +112,9 @@ const Login = () => {
         <h1>🔐 Secure Messages</h1>
         <h2>Zaloguj się</h2>
 
-        {successMessage && <div className='success-message'>{successMessage}</div>}
+        {successMessage && (
+          <div className='success-message'>{successMessage}</div>
+        )}
         {error && <div className='error-message'>{error}</div>}
 
         <form onSubmit={handleSubmit}>

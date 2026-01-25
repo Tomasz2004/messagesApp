@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { messageAPI, userAPI, authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { QRCodeSVG } from 'qrcode.react';
 import SendMessage from '../components/SendMessage';
 import MessageList from '../components/MessageList';
 import './Dashboard.css';
@@ -190,19 +189,24 @@ const Dashboard = () => {
       {/* Modal do włączania TOTP */}
       {showTotpModal && totpSetup && (
         <div className='modal-overlay' onClick={handleCloseTotpModal}>
-          <div className='modal-content totp-setup-modal' onClick={(e) => e.stopPropagation()}>
+          <div
+            className='modal-content totp-setup-modal'
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2>Włącz 2FA</h2>
-            
+
             <div className='totp-setup-section'>
-              <p>1. Zeskanuj poniższy kod QR w aplikacji Google Authenticator:</p>
+              <p>
+                1. Zeskanuj poniższy kod QR w aplikacji Google Authenticator:
+              </p>
               <div className='qr-code'>
-                <QRCodeSVG
-                  value={totpSetup.totpQrCode}
-                  size={180}
-                  level='H'
+                <img
+                  src={totpSetup.totpQrCode}
+                  alt='TOTP QR Code'
+                  style={{ width: '200px', height: '200px' }}
                 />
               </div>
-              
+
               <div className='totp-secret'>
                 <p>Lub wprowadź kod ręcznie:</p>
                 <code>{totpSetup.totpSecret}</code>
@@ -226,10 +230,7 @@ const Dashboard = () => {
               <button onClick={handleEnableTotp} className='btn-primary'>
                 Włącz 2FA
               </button>
-              <button
-                onClick={handleCloseTotpModal}
-                className='btn-secondary'
-              >
+              <button onClick={handleCloseTotpModal} className='btn-secondary'>
                 Anuluj
               </button>
             </div>

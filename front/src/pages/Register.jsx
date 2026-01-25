@@ -65,8 +65,10 @@ const Register = () => {
       });
 
       // Rejestracja udana - przekieruj do logowania
-      navigate('/login', { 
-        state: { message: 'Konto zostało utworzone. Możesz się teraz zalogować.' } 
+      navigate('/login', {
+        state: {
+          message: 'Konto zostało utworzone. Możesz się teraz zalogować.',
+        },
       });
     } catch (err) {
       console.error('Registration error:', err);
@@ -85,79 +87,79 @@ const Register = () => {
         <h1>🔐 Secure Messages</h1>
         <h2>Utwórz konto</h2>
 
-            {error && <div className='error-message'>{error}</div>}
+        {error && <div className='error-message'>{error}</div>}
 
-            <form onSubmit={handleSubmit}>
-              <div className='form-group'>
-                <label htmlFor='username'>Nazwa użytkownika</label>
-                <input
-                  type='text'
-                  id='username'
-                  name='username'
-                  value={formData.username}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  autoComplete='username'
-                  minLength='3'
-                />
-              </div>
+        <form onSubmit={handleSubmit}>
+          <div className='form-group'>
+            <label htmlFor='username'>Nazwa użytkownika</label>
+            <input
+              type='text'
+              id='username'
+              name='username'
+              value={formData.username}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              autoComplete='username'
+              minLength='3'
+            />
+          </div>
 
-              <div className='form-group'>
-                <label htmlFor='email'>Email</label>
-                <input
-                  type='email'
-                  id='email'
-                  name='email'
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  autoComplete='email'
-                />
-              </div>
+          <div className='form-group'>
+            <label htmlFor='email'>Email</label>
+            <input
+              type='email'
+              id='email'
+              name='email'
+              value={formData.email}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              autoComplete='email'
+            />
+          </div>
 
-              <div className='form-group'>
-                <label htmlFor='password'>Hasło</label>
-                <input
-                  type='password'
-                  id='password'
-                  name='password'
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  autoComplete='new-password'
-                />
-                <small className='password-hint'>
-                  Min. 12 znaków, wielka/mała litera, cyfra i znak specjalny
-                </small>
-              </div>
+          <div className='form-group'>
+            <label htmlFor='password'>Hasło</label>
+            <input
+              type='password'
+              id='password'
+              name='password'
+              value={formData.password}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              autoComplete='new-password'
+            />
+            <small className='password-hint'>
+              Min. 12 znaków, wielka/mała litera, cyfra i znak specjalny
+            </small>
+          </div>
 
-              <div className='form-group'>
-                <label htmlFor='confirmPassword'>Potwierdź hasło</label>
-                <input
-                  type='password'
-                  id='confirmPassword'
-                  name='confirmPassword'
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  autoComplete='new-password'
-                />
-              </div>
+          <div className='form-group'>
+            <label htmlFor='confirmPassword'>Potwierdź hasło</label>
+            <input
+              type='password'
+              id='confirmPassword'
+              name='confirmPassword'
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              autoComplete='new-password'
+            />
+          </div>
 
-              <button type='submit' className='btn-primary' disabled={loading}>
-                {loading ? 'Rejestracja...' : 'Zarejestruj się'}
-              </button>
-            </form>
+          <button type='submit' className='btn-primary' disabled={loading}>
+            {loading ? 'Rejestracja...' : 'Zarejestruj się'}
+          </button>
+        </form>
 
-            <div className='register-footer'>
-              <p>
-                Masz już konto? <Link to='/login'>Zaloguj się</Link>
-              </p>
-            </div>
+        <div className='register-footer'>
+          <p>
+            Masz już konto? <Link to='/login'>Zaloguj się</Link>
+          </p>
+        </div>
       </div>
     </div>
   );
