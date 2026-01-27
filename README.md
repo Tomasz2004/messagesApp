@@ -46,7 +46,7 @@ Poniżej krótki opis mechanizmów kryptograficznych użytych w projekcie, przep
 - Podpisy: **SHA256withRSA** (RSASSA-PKCS1-v1_5 + SHA-256).
 - 2FA: **TOTP** (SHA-1, 6 cyfr, okres 30s).
 
-### 🧾 Rejestracja (wysokopoziomowo)
+### 🧾 Rejestracja
 
 1. Walidacja siły hasła (reguły w kodzie).
 2. Generowana sól i hash hasła (PBKDF2), oba zapisywane w DB.
@@ -64,7 +64,7 @@ Poniżej krótki opis mechanizmów kryptograficznych użytych w projekcie, przep
 
 ![Logowanie](images/login.png)
 
-### ✉️ Wysyłanie wiadomości (E2EE)
+### ✉️ Wysyłanie wiadomości
 
 - Nadawca generuje losowy AES-256 i IV.
 - `subject` i `content` szyfrowane AES-GCM tym kluczem i IV.
