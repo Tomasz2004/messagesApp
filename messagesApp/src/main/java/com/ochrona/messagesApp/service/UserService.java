@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.SecretKey;
 import java.security.KeyPair;
-import java.security.PrivateKey;
 import java.time.LocalDateTime;
 import java.util.List;
 
