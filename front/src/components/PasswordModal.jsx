@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import cryptoService from '../services/cryptoService';
 import { useAuth } from '../context/AuthContext';
 import './PasswordModal.css';
 
 const PasswordModal = ({ onSuccess, onCancel }) => {
-  const { unlockPrivateKey } = useAuth();
+  const { unlockPrivateKey, privateKeyDecrypt, privateKeySign } = useAuth();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Jeśli klucze prywatne zostały już odszyfrowane gdzie indziej, zamknij modal automatycznie
+  useEffect(() => {
+    if ((privateKeyDecrypt || privateKeySign) && !loading) {
+      onCancel();
+    }
+  }, [privateKeyDecrypt, privateKeySign, loading, onCancel]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,8 +43,15 @@ const PasswordModal = ({ onSuccess, onCancel }) => {
       // Zapisz klucze w kontekście (tylko w pamięci)
       unlockPrivateKey(privateKeyDecrypt, privateKeySign);
 
-      // Powiadom rodzica o sukcesie
-      onSuccess(privateKeyDecrypt, privateKeySign);
+      // Powiadom rodzica o sukcesie i zamknij modal (obsłuż asynchroniczne onSuccess)
+      try {
+        await Promise.resolve(onSuccess?.(privateKeyDecrypt, privateKeySign));
+      } catch (cbErr) {
+        console.error('onSuccess callback error:', cbErr);
+      }
+
+      // Zawsze zamknij modal po sukcesie
+      onCancel();
     } catch (err) {
       console.error('Password unlock error:', err);
       setError('Nieprawidłowe hasło. Spróbuj ponownie.');
