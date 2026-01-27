@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { messageAPI } from '../services/api';
 import MessageView from './MessageView';
 import './MessageList.css';
+import { useAuth } from '../context/AuthContext';
+import cryptoService from '../services/cryptoService';
+import PasswordModal from './PasswordModal';
 
 const MessageList = ({ type }) => {
   const [messages, setMessages] = useState([]);
@@ -9,13 +12,10 @@ const MessageList = ({ type }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    // Resetuj wybraną wiadomość przy zmianie zakładki
-    setSelectedMessage(null);
-    fetchMessages();
-  }, [type]);
+  const { privateKeyDecrypt } = useAuth();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -32,20 +32,93 @@ const MessageList = ({ type }) => {
             ?.filter((r) => r.recipientId !== msg.senderId) // Wyfiltruj nadawcę z listy odbiorców
             .map((r) => r.recipientUsername) || [],
         sentAt: msg.createdAt, // Dodaj alias dla createdAt
+        // Pola pomocnicze do UI
+        decryptedSubject: null,
+        subjectLocked: !!msg.subjectEncrypted,
       }));
 
       setMessages(messagesWithUsernames);
+
+      // Spróbuj odszyfrować tematy jeśli mamy klucz prywatny
+      if (privateKeyDecrypt) {
+        try {
+          await decryptSubjects(messagesWithUsernames, privateKeyDecrypt);
+        } catch {
+          // ignoruj błędy (np. brak dostępu do klucza dla niektórych wiadomości)
+        }
+      }
     } catch (err) {
       console.error('Error fetching messages:', err);
       setError('Błąd podczas pobierania wiadomości');
     } finally {
       setLoading(false);
     }
-  };
+  }, [type, privateKeyDecrypt]);
+
+  useEffect(() => {
+    // Resetuj wybraną wiadomość przy zmianie zakładki
+    setSelectedMessage(null);
+    fetchMessages();
+  }, [fetchMessages]);
 
   const handleMessageClick = (message) => {
     setSelectedMessage(message);
   };
+
+  // Odszyfruj tematy wiadomości (asynchronicznie)
+  const decryptSubjects = async (msgs, privKey) => {
+    const updated = await Promise.all(
+      msgs.map(async (m) => {
+        try {
+          if (!m.subjectEncrypted || !m.encryptedAesKey) return m;
+
+          const encryptedAesKeyBuffer = cryptoService.base64ToArrayBuffer(
+            m.encryptedAesKey,
+          );
+
+          const aesKeyBytes = await cryptoService.decryptBytesWithRSA(
+            encryptedAesKeyBuffer,
+            privKey,
+          );
+
+          const importedAesKey = await cryptoService.importAESKey(aesKeyBytes);
+
+          const subjectBuffer = cryptoService.base64ToArrayBuffer(
+            m.subjectEncrypted,
+          );
+
+          const iv = cryptoService.base64ToArrayBuffer(m.iv);
+
+          const subject = await cryptoService.decryptWithAES(
+            subjectBuffer,
+            importedAesKey,
+            new Uint8Array(iv),
+          );
+
+          return { ...m, decryptedSubject: subject, subjectLocked: false };
+        } catch {
+          // Nie udało się odszyfrować tej wiadomości (np. brak uprawnień) — zostaw flagę locked
+          return { ...m, decryptedSubject: null, subjectLocked: true };
+        }
+      }),
+    );
+
+    setMessages(updated);
+  };
+
+  // Obsługa po odblokowaniu klucza (z PasswordModal)
+  const onUnlockSuccess = async () => {
+    setShowPasswordModal(false);
+    if (privateKeyDecrypt) {
+      try {
+        await decryptSubjects(messages, privateKeyDecrypt);
+      } catch (err) {
+        console.error('Decrypt after unlock failed', err);
+      }
+    }
+  };
+
+  const onOpenUnlock = () => setShowPasswordModal(true);
 
   const handleBack = () => {
     setSelectedMessage(null);
@@ -58,7 +131,7 @@ const MessageList = ({ type }) => {
         await messageAPI.deleteMessage(messageId);
         setSelectedMessage(null); // Wróć do listy wiadomości
         fetchMessages();
-      } catch (err) {
+      } catch {
         alert('Błąd podczas usuwania wiadomości');
       }
     }
@@ -103,6 +176,13 @@ const MessageList = ({ type }) => {
 
   return (
     <div className='message-list'>
+      {showPasswordModal && (
+        <PasswordModal
+          onSuccess={() => onUnlockSuccess()}
+          onCancel={() => setShowPasswordModal(false)}
+        />
+      )}
+
       <div className='message-list-header'>
         <h2>
           {type === 'inbox'
@@ -139,9 +219,37 @@ const MessageList = ({ type }) => {
                 </span>
               </div>
               <div className='message-item-subject'>
-                {message.subjectEncrypted
-                  ? '🔒 Zaszyfrowany temat'
-                  : 'Brak tematu'}
+                {message.decryptedSubject ? (
+                  message.decryptedSubject
+                ) : message.subjectEncrypted ? (
+                  <>
+                    <span className='encrypted-note'>
+                      🔒 Zaszyfrowany temat
+                    </span>
+                    {privateKeyDecrypt ? (
+                      // mamy klucz, ale odszyfrowanie mogło się nie powieść
+                      <small className='encrypted-hint'>
+                        {' '}
+                        — wymaga odblokowania klucza lub uprawnień
+                      </small>
+                    ) : (
+                      <span className='encrypted-hint'>
+                        {' '}
+                        — wpisz hasło, aby odszyfrować
+                      </span>
+                    )}
+                    {!privateKeyDecrypt && (
+                      <button
+                        className='btn-unlock-inline'
+                        onClick={onOpenUnlock}
+                      >
+                        Odblokuj
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  'Brak tematu'
+                )}
               </div>
               {!message.isRead && type === 'inbox' && (
                 <span className='unread-indicator'>●</span>

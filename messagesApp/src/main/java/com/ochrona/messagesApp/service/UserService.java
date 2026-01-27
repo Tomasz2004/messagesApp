@@ -249,6 +249,14 @@ public class UserService {
     }
 
     /**
+     * Pobranie użytkownika po username
+     */
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
+
+    /**
      * Obsługa nieudanego logowania
      */
     private void handleFailedLogin(User user) {

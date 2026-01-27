@@ -67,6 +67,32 @@
   font-size: 0.95rem;
 }
 
+.encrypted-note {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.encrypted-hint {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-left: 0.4rem;
+}
+
+.btn-unlock-inline {
+  margin-left: 0.6rem;
+  background: transparent;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-unlock-inline:hover {
+  background: rgba(79, 70, 229, 0.06);
+}
+
 .unread-indicator {
   position: absolute;
   top: 1.25rem;

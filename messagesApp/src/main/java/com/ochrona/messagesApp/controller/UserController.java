@@ -73,6 +73,29 @@ public class UserController {
         }
     }
 
+    @GetMapping("/lookup")
+    @Operation(summary = "Lookup user by username", description = "Find user by username")
+    public ResponseEntity<UserInfoResponse> getUserByUsername(@RequestParam String username) {
+        try {
+            User user = userService.getUserByUsername(username);
+            UserInfoResponse response = UserInfoResponse.builder()
+                    .id(user.getId())
+                    .username(user.getUsername())
+                    .email(user.getEmail())
+                    .publicKey(user.getPublicKey())
+                    .totpEnabled(user.getTotpEnabled())
+                    .build();
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.error("User not found: {}", username);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error looking up user", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/me")
     @Operation(summary = "Get current user info", description = "Returns currently authenticated user information")
     public ResponseEntity<UserInfoResponse> getCurrentUser(HttpServletRequest request) {

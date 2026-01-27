@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { userAPI, messageAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import cryptoService from '../services/cryptoService';
@@ -6,10 +6,11 @@ import PasswordModal from './PasswordModal';
 import './SendMessage.css';
 
 const SendMessage = ({ onClose }) => {
-  const { user, privateKeyDecrypt, privateKeySign } = useAuth();
-  const [users, setUsers] = useState([]);
+  const { user, privateKeySign } = useAuth();
+  // recipients: array of { id, username, publicKey }
+  const [recipients, setRecipients] = useState([]);
+  const [recipientUsernameInput, setRecipientUsernameInput] = useState('');
   const [formData, setFormData] = useState({
-    recipientIds: [],
     subject: '',
     content: '',
   });
@@ -18,37 +19,51 @@ const SendMessage = ({ onClose }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [unlockedPrivateKeyDecrypt, setUnlockedPrivateKeyDecrypt] =
-    useState(null);
+
   const [unlockedPrivateKeySign, setUnlockedPrivateKeySign] = useState(null);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  // Dodaj odbiorcę po username
+  const handleAddRecipient = async () => {
+    const username = recipientUsernameInput.trim();
+    if (!username) {
+      setError('Wpisz nazwę użytkownika');
+      return;
+    }
 
-  const fetchUsers = async () => {
+    if (username === user.username) {
+      setError('Nie możesz dodać siebie jako odbiorcy');
+      return;
+    }
+
+    if (recipients.some((r) => r.username === username)) {
+      setError('Użytkownik już dodany');
+      return;
+    }
+
     try {
-      const response = await userAPI.getAllUsers();
-      // Filtruj aktualnego użytkownika z listy
-      const filteredUsers = response.data.filter((u) => u.id !== user.id);
-      setUsers(filteredUsers);
+      const resp = await userAPI.getUserByUsername(username);
+      const found = resp.data;
+
+      setRecipients((prev) => [
+        ...prev,
+        { id: found.id, username: found.username, publicKey: found.publicKey },
+      ]);
+
+      setRecipientUsernameInput('');
+      setError('');
     } catch (err) {
-      console.error('Error fetching users:', err);
-      setError('Błąd podczas pobierania listy użytkowników');
+      if (err.response?.status === 404) {
+        setError('Użytkownik nie znaleziony');
+      } else {
+        console.error('Error looking up user:', err);
+        setError('Błąd podczas wyszukiwania użytkownika');
+      }
     }
   };
 
-  const handleRecipientToggle = (userId) => {
-    setFormData((prev) => {
-      const isSelected = prev.recipientIds.includes(userId);
-      return {
-        ...prev,
-        recipientIds: isSelected
-          ? prev.recipientIds.filter((id) => id !== userId)
-          : [...prev.recipientIds, userId],
-      };
-    });
+  const removeRecipient = (id) => {
+    setRecipients((prev) => prev.filter((r) => r.id !== id));
   };
 
   const handleChange = (e) => {
@@ -122,7 +137,7 @@ const SendMessage = ({ onClose }) => {
     setError('');
     setLoading(true);
 
-    if (formData.recipientIds.length === 0) {
+    if (recipients.length === 0) {
       setError('Wybierz co najmniej jednego odbiorcę');
       setLoading(false);
       return;
@@ -200,10 +215,9 @@ const SendMessage = ({ onClose }) => {
       // Eksportuj klucz AES do raw bytes
       const aesKeyBytes = await cryptoService.exportAESKey(aesKey);
 
-      // Dla każdego odbiorcy: zaszyfruj klucz AES jego kluczem publicznym RSA
-      const recipients = await Promise.all(
-        formData.recipientIds.map(async (recipientId) => {
-          const recipient = users.find((u) => u.id === recipientId);
+      // Dla każdego dodanego odbiorcy: zaszyfruj klucz AES jego kluczem publicznym RSA
+      const recipientsPayload = await Promise.all(
+        recipients.map(async (recipient) => {
           const publicKey = await cryptoService.importPublicKey(
             recipient.publicKey,
           );
@@ -214,27 +228,29 @@ const SendMessage = ({ onClose }) => {
           );
 
           return {
-            recipientId: recipientId,
+            recipientId: recipient.id,
             encryptedAesKey: cryptoService.arrayBufferToBase64(encryptedAesKey),
           };
         }),
       );
 
-      // Dodaj nadawcę do recipients
-      const senderPublicKey = await cryptoService.importPublicKey(
-        user.publicKey,
-      );
-      const senderEncryptedAesKey = await cryptoService.encryptBytesWithRSA(
-        aesKeyBytes,
-        senderPublicKey,
-      );
+      // Dodaj kopię dla nadawcy jeśli jeszcze nie dodano
+      if (!recipients.some((r) => r.id === user.id)) {
+        const senderPublicKey = await cryptoService.importPublicKey(
+          user.publicKey,
+        );
+        const senderEncryptedAesKey = await cryptoService.encryptBytesWithRSA(
+          aesKeyBytes,
+          senderPublicKey,
+        );
 
-      recipients.push({
-        recipientId: user.id,
-        encryptedAesKey: cryptoService.arrayBufferToBase64(
-          senderEncryptedAesKey,
-        ),
-      });
+        recipientsPayload.push({
+          recipientId: user.id,
+          encryptedAesKey: cryptoService.arrayBufferToBase64(
+            senderEncryptedAesKey,
+          ),
+        });
+      }
 
       // Użyj kluczy prywatnych z kontekstu lub odblokowanych kluczy (CryptoKey)
       const currentPrivateKeySign = privateKeySign || unlockedPrivateKeySign;
@@ -263,7 +279,7 @@ const SendMessage = ({ onClose }) => {
 
       // Przygotuj dane do wysłania
       const messageData = {
-        recipients: recipients,
+        recipients: recipientsPayload,
         subjectEncrypted: cryptoService.arrayBufferToBase64(encryptedSubject),
         contentEncrypted: cryptoService.arrayBufferToBase64(encryptedContent),
         iv: cryptoService.arrayBufferToBase64(iv),
@@ -291,7 +307,6 @@ const SendMessage = ({ onClose }) => {
 
   // Obsługa po odblokowaniu klucza prywatnego
   const handlePasswordSuccess = (keyDecrypt, keySign) => {
-    setUnlockedPrivateKeyDecrypt(keyDecrypt);
     setUnlockedPrivateKeySign(keySign);
     setShowPasswordModal(false);
     // Automatycznie ponów wysłanie formularza
@@ -329,19 +344,45 @@ const SendMessage = ({ onClose }) => {
       <form onSubmit={handleSubmit}>
         <div className='form-group'>
           <label>Odbiorcy:</label>
-          <div className='recipients-list'>
-            {users.map((u) => (
-              <label key={u.id} className='recipient-checkbox'>
-                <input
-                  type='checkbox'
-                  checked={formData.recipientIds.includes(u.id)}
-                  onChange={() => handleRecipientToggle(u.id)}
-                  disabled={loading}
-                />
-                <span>{u.username}</span>
-                <small>{u.email}</small>
-              </label>
-            ))}
+          <div className='recipient-input-row'>
+            <input
+              type='text'
+              value={recipientUsernameInput}
+              onChange={(e) => {
+                setRecipientUsernameInput(e.target.value);
+                setError('');
+              }}
+              disabled={loading}
+              placeholder='Wpisz username i kliknij Dodaj'
+            />
+            <button
+              type='button'
+              className='btn-add-recipient'
+              onClick={handleAddRecipient}
+              disabled={loading || !recipientUsernameInput.trim()}
+            >
+              Dodaj
+            </button>
+          </div>
+
+          <div className='selected-recipients'>
+            {recipients.length === 0 ? (
+              <small>Brak odbiorców. Dodaj username odbiorcy.</small>
+            ) : (
+              recipients.map((r) => (
+                <div key={r.id} className='recipient-chip'>
+                  <span>{r.username}</span>
+                  <button
+                    type='button'
+                    onClick={() => removeRecipient(r.id)}
+                    disabled={loading}
+                    title='Usuń'
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 

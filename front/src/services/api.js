@@ -136,6 +136,8 @@ export const authAPI = {
 export const userAPI = {
   getAllUsers: () => api.get('/users'),
   getUserById: (userId) => api.get(`/users/${userId}`),
+  getUserByUsername: (username) =>
+    api.get(`/users/lookup?username=${encodeURIComponent(username)}`),
   getCurrentUser: () => api.get('/users/me'),
   deleteUser: (userId) => api.delete(`/users/${userId}`),
 };
