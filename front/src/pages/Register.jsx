@@ -26,21 +26,21 @@ const Register = () => {
     if (formData.password.length < 12) {
       return 'Hasło musi mieć co najmniej 12 znaków';
     }
-    if (!/[A-Z]/.test(formData.password)) {
-      return 'Hasło musi zawierać wielką literę';
+
+    let categories = 0;
+    if (/[a-z]/.test(formData.password)) categories++;
+    if (/[A-Z]/.test(formData.password)) categories++;
+    if (/[0-9]/.test(formData.password)) categories++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) categories++;
+
+    if (categories < 3) {
+      return 'Hasło musi zawierać co najmniej 3 z 4 kategorii: małe litery, duże litery, cyfry, znaki specjalne.';
     }
-    if (!/[a-z]/.test(formData.password)) {
-      return 'Hasło musi zawierać małą literę';
-    }
-    if (!/[0-9]/.test(formData.password)) {
-      return 'Hasło musi zawierać cyfrę';
-    }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
-      return 'Hasło musi zawierać znak specjalny';
-    }
+
     if (formData.password !== formData.confirmPassword) {
       return 'Hasła nie są identyczne';
     }
+
     return null;
   };
 
@@ -132,7 +132,8 @@ const Register = () => {
               autoComplete='new-password'
             />
             <small className='password-hint'>
-              Min. 12 znaków, wielka/mała litera, cyfra i znak specjalny
+              Min. 12 znaków i min. 3 z 4 kategorii: małe litery, duże litery,
+              cyfry, znaki specjalne.
             </small>
           </div>
 

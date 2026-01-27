@@ -49,7 +49,7 @@ public class UserService {
         CryptoService.PasswordStrength strength = cryptoService.checkPasswordStrength(request.getPassword());
         if (strength == CryptoService.PasswordStrength.WEAK) {
             throw new IllegalArgumentException(
-                    "Password is too weak. Use at least 12 characters with uppercase, lowercase, numbers and special characters");
+                    "Hasło jest za słabe. Użyj co najmniej 12 znaków i co najmniej 3 z 4 kategorii: małe litery, duże litery, cyfry, znaki specjalne. Unikaj powszechnych haseł oraz sekwencji i powtórzeń.");
         }
 
         // Generowanie soli i hashowanie hasła
@@ -109,28 +109,32 @@ public class UserService {
      */
     @Transactional
     public LoginResponse login(LoginRequest request) throws Exception {
-        // Pobranie użytkownika - celowo ten sam komunikat dla obu przypadków
-        // (bezpieczeństwo)
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("Nieprawidłowa nazwa użytkownika lub hasło."));
 
+        // Time attack protection
+        boolean userExists = (user != null);
+        User effectiveUser = userExists ? user : createDummyUser();
+
         // Sprawdzenie czy konto nie jest zablokowane
-        if (user.getAccountLockedUntil() != null &&
-                user.getAccountLockedUntil().isAfter(LocalDateTime.now())) {
-            long minutesLeft = java.time.Duration.between(LocalDateTime.now(), user.getAccountLockedUntil()).toMinutes()
-                    + 1;
+        if (userExists && effectiveUser.getAccountLockedUntil() != null &&
+                effectiveUser.getAccountLockedUntil().isAfter(LocalDateTime.now())) {
+            long minutesLeft = java.time.Duration.between(
+                    LocalDateTime.now(),
+                    effectiveUser.getAccountLockedUntil()).toMinutes() + 1;
             throw new IllegalArgumentException(
                     "Konto zostało tymczasowo zablokowane. Spróbuj ponownie za " + minutesLeft + " min.");
         }
 
         // Weryfikacja hasła
-        if (!cryptoService.verifyPassword(request.getPassword(), user.getPasswordHash(), user.getSalt())) {
-            handleFailedLogin(user);
+        if (!cryptoService.verifyPassword(request.getPassword(), effectiveUser.getPasswordHash(),
+                effectiveUser.getSalt())) {
+            handleFailedLogin(effectiveUser);
             throw new IllegalArgumentException("Nieprawidłowa nazwa użytkownika lub hasło.");
         }
 
         // Weryfikacja TOTP jeśli włączone
-        if (user.getTotpEnabled()) {
+        if (effectiveUser.getTotpEnabled()) {
             if (request.getTotpCode() == null || request.getTotpCode().isEmpty()) {
                 return LoginResponse.builder()
                         .totpRequired(true)
@@ -138,31 +142,31 @@ public class UserService {
                         .build();
             }
 
-            if (!totpService.verifyCode(user.getTotpSecret(), request.getTotpCode())) {
-                handleFailedLogin(user);
+            if (!totpService.verifyCode(effectiveUser.getTotpSecret(), request.getTotpCode())) {
+                handleFailedLogin(effectiveUser);
                 throw new IllegalArgumentException("Nieprawidłowy kod 2FA.");
             }
         }
 
         // Reset licznika nieudanych prób
-        user.setFailedLoginAttempts(0);
-        user.setAccountLockedUntil(null);
-        user.setLastLogin(LocalDateTime.now());
-        userRepository.save(user);
+        effectiveUser.setFailedLoginAttempts(0);
+        effectiveUser.setAccountLockedUntil(null);
+        effectiveUser.setLastLogin(LocalDateTime.now());
+        userRepository.save(effectiveUser);
 
         // Generowanie tokena JWT
-        String token = jwtService.generateToken(user.getId(), user.getUsername());
+        String token = jwtService.generateToken(effectiveUser.getId(), effectiveUser.getUsername());
 
-        log.info("User logged in successfully: {}", user.getUsername());
+        log.info("User logged in successfully: {}", effectiveUser.getUsername());
 
         return LoginResponse.builder()
                 .token(token)
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .publicKey(user.getPublicKey())
-                .encryptedPrivateKey(user.getPrivateKeyEncrypted())
-                .keyDerivationSalt(user.getKeyDerivationSalt())
+                .userId(effectiveUser.getId())
+                .username(effectiveUser.getUsername())
+                .email(effectiveUser.getEmail())
+                .publicKey(effectiveUser.getPublicKey())
+                .encryptedPrivateKey(effectiveUser.getPrivateKeyEncrypted())
+                .keyDerivationSalt(effectiveUser.getKeyDerivationSalt())
                 .totpRequired(false)
                 .message("Login successful")
                 .build();
@@ -257,6 +261,27 @@ public class UserService {
         }
 
         userRepository.save(user);
+    }
+
+    private User createDummyUser() {
+        try {
+            // Dummy user z dummy danymi (żeby verify zajął tyle samo czasu)
+            return User.builder()
+                    .username("dummy_user")
+                    .passwordHash(cryptoService.hashPassword("dummy_password", "dummy_salt"))
+                    .salt("dummy_salt")
+                    .accountLockedUntil(null)
+                    .totpEnabled(false)
+                    .failedLoginAttempts(0)
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create dummy user", e);
+            return User.builder()
+                    .username("dummy")
+                    .passwordHash("dummy")
+                    .salt("dummy")
+                    .build();
+        }
     }
 
     /**

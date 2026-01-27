@@ -16,6 +16,9 @@ import java.security.spec.KeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Serwis kryptograficzny implementujący:
@@ -263,24 +266,83 @@ public class CryptoService {
 
     // ==================== Walidacja siły hasła ====================
 
-    /**
-     * Sprawdza siłę hasła
-     */
+    private static final int MIN_PASSWORD_LENGTH = 12;
+    private static final Set<String> COMMON_PASSWORDS = new HashSet<>(Arrays.asList(
+            "123456", "password", "123456789", "12345678", "12345",
+            "1234567", "qwerty", "abc123", "football", "monkey",
+            "letmein", "dragon", "111111", "baseball", "iloveyou",
+            "trustno1", "123123", "password1"));
+
     public PasswordStrength checkPasswordStrength(String password) {
-        int score = 0;
-
-        if (password.matches(".*[a-z].*"))
-            score++;
-        if (password.matches(".*[A-Z].*"))
-            score++;
-        if (password.matches(".*\\d.*"))
-            score++;
-        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*"))
-            score++;
-
-        if (score <= 3)
+        if (password == null || password.trim().isEmpty())
             return PasswordStrength.WEAK;
-        return PasswordStrength.STRONG;
+
+        String pw = password.trim();
+
+        // Block very short passwords
+        if (pw.length() < MIN_PASSWORD_LENGTH)
+            return PasswordStrength.WEAK;
+
+        // Block common passwords
+        if (isCommonPassword(pw))
+            return PasswordStrength.WEAK;
+
+        // Block simple sequences or repeated chars
+        if (hasSequentialChars(pw, 4) || hasRepeatedChars(pw, 4))
+            return PasswordStrength.WEAK;
+
+        // Count character classes
+        int categories = 0;
+        if (pw.matches(".*[a-z].*"))
+            categories++;
+        if (pw.matches(".*[A-Z].*"))
+            categories++;
+        if (pw.matches(".*\\d.*"))
+            categories++;
+        if (pw.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*"))
+            categories++;
+
+        if ((pw.length() >= 16 && categories >= 2) || (pw.length() >= MIN_PASSWORD_LENGTH && categories >= 3))
+            return PasswordStrength.STRONG;
+
+        return PasswordStrength.WEAK;
+    }
+
+    private boolean isCommonPassword(String password) {
+        return COMMON_PASSWORDS.contains(password.toLowerCase());
+    }
+
+    private boolean hasRepeatedChars(String pw, int threshold) {
+        int count = 1;
+        for (int i = 1; i < pw.length(); i++) {
+            if (pw.charAt(i) == pw.charAt(i - 1)) {
+                count++;
+                if (count >= threshold)
+                    return true;
+            } else {
+                count = 1;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasSequentialChars(String pw, int seqLen) {
+        String lower = pw.toLowerCase();
+        for (int i = 0; i + seqLen <= lower.length(); i++) {
+            boolean asc = true;
+            boolean desc = true;
+            for (int j = 1; j < seqLen; j++) {
+                char prev = lower.charAt(i + j - 1);
+                char cur = lower.charAt(i + j);
+                if (cur - prev != 1)
+                    asc = false;
+                if (prev - cur != 1)
+                    desc = false;
+            }
+            if (asc || desc)
+                return true;
+        }
+        return false;
     }
 
     public enum PasswordStrength {
