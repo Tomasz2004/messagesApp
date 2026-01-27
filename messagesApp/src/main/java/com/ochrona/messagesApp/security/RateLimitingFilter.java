@@ -1,5 +1,7 @@
 package com.ochrona.messagesApp.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
@@ -13,8 +15,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Filtr ograniczający liczbę zapytań (Rate Limiting) - ochrona przed
@@ -29,10 +29,20 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-    // Cache bucketów per IP - w produkcji użyć Redis
-    private final Map<String, Bucket> loginBuckets = new ConcurrentHashMap<>();
-    private final Map<String, Bucket> registerBuckets = new ConcurrentHashMap<>();
-    private final Map<String, Bucket> generalBuckets = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> loginBuckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumSize(100_000)
+            .build();
+
+    private final Cache<String, Bucket> registerBuckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumSize(100_000)
+            .build();
+
+    private final Cache<String, Bucket> generalBuckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumSize(100_000)
+            .build();
 
     // Limity
     private static final int LOGIN_LIMIT = 5; // 5 prób logowania
@@ -54,13 +64,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         // Wybierz odpowiedni bucket w zależności od endpointu
         if (path.contains("/auth/login") && "POST".equals(method)) {
-            bucket = loginBuckets.computeIfAbsent(clientIP, this::createLoginBucket);
+            bucket = loginBuckets.get(clientIP, this::createLoginBucket);
             limitType = "login";
         } else if (path.contains("/auth/register") && "POST".equals(method)) {
-            bucket = registerBuckets.computeIfAbsent(clientIP, this::createRegisterBucket);
+            bucket = registerBuckets.get(clientIP, this::createRegisterBucket);
             limitType = "register";
         } else {
-            bucket = generalBuckets.computeIfAbsent(clientIP, this::createGeneralBucket);
+            bucket = generalBuckets.get(clientIP, this::createGeneralBucket);
             limitType = "general";
         }
 
@@ -70,15 +80,13 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             response.setHeader("X-Rate-Limit-Remaining", String.valueOf(bucket.getAvailableTokens()));
             filterChain.doFilter(request, response);
         } else {
-            // Limit przekroczony - BLOKUJ request (nie przepuszczaj do kontrolera!)
-            log.warn("Rate limit exceeded for IP: {} on {} endpoint", clientIP, limitType);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json;charset=UTF-8");
             response.setHeader("X-Rate-Limit-Remaining", "0");
             response.setHeader("Retry-After", "60");
             response.getWriter()
                     .write("{\"message\": \"Zbyt wiele prób. Spróbuj ponownie za 60 sekund.\", \"retryAfter\": 60}");
-            return; // WAŻNE: nie wywołuj filterChain.doFilter!
+            return;
         }
     }
 
@@ -123,15 +131,39 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
             // X-Forwarded-For może zawierać wiele IP, pierwszy to oryginalny klient
-            return xForwardedFor.split(",")[0].trim();
+            String clientIP = xForwardedFor.split(",")[0].trim();
+            if (isValidIP(clientIP)) {
+                return clientIP;
+            }
         }
 
         String xRealIP = request.getHeader("X-Real-IP");
-        if (xRealIP != null && !xRealIP.isEmpty()) {
+        if (xRealIP != null && !xRealIP.isEmpty() && isValidIP(xRealIP)) {
             return xRealIP;
         }
 
         return request.getRemoteAddr();
+    }
+
+    private boolean isValidIP(String ip) {
+        if (ip == null || ip.isEmpty()) {
+            return false;
+        }
+
+        // Blokuj oczywiste próby injection
+        if (ip.contains("..") || ip.contains(" ") || ip.contains(";") ||
+                ip.contains("'") || ip.contains("\"") || ip.contains("<") || ip.contains(">")) {
+            return false;
+        }
+
+        final String IPV4_REGEX = "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+
+        final String IPV6_REGEX = "^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$";
+
+        return ip.matches(IPV4_REGEX) || ip.matches(IPV6_REGEX);
     }
 
     @Override

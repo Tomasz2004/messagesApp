@@ -20,8 +20,7 @@ import java.util.ArrayList;
 
 /**
  * Filtr JWT do walidacji tokenów w każdym żądaniu
- * Obsługuje token z HttpOnly cookie (preferowany) lub nagłówka Authorization
- * (fallback)
+ * Obsługuje token z HttpOnly cookie
  */
 @Component
 @RequiredArgsConstructor
@@ -39,13 +38,7 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
         String jwt = null;
         String username;
 
-        // 1. Najpierw sprawdź HttpOnly cookie (bezpieczniejsze)
         jwt = getTokenFromCookie(request);
-
-        // 2. Fallback: sprawdź nagłówek Authorization (dla kompatybilności)
-        if (jwt == null) {
-            jwt = getTokenFromHeader(request);
-        }
 
         // Jeśli nie ma tokena, kontynuuj bez autentykacji
         if (jwt == null) {
@@ -103,17 +96,6 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
                     return cookie.getValue();
                 }
             }
-        }
-        return null;
-    }
-
-    /**
-     * Pobiera token JWT z nagłówka Authorization (fallback)
-     */
-    private String getTokenFromHeader(HttpServletRequest request) {
-        final String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
         }
         return null;
     }
