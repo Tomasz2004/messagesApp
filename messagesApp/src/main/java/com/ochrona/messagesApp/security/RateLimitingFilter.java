@@ -146,42 +146,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
      * Pobierz IP klienta (uwzględniając proxy/load balancer)
      */
     private String getClientIP(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            // X-Forwarded-For może zawierać wiele IP, pierwszy to oryginalny klient
-            String clientIP = xForwardedFor.split(",")[0].trim();
-            if (isValidIP(clientIP)) {
-                return clientIP;
-            }
-        }
+        String remoteAddr = request.getRemoteAddr();
 
-        String xRealIP = request.getHeader("X-Real-IP");
-        if (xRealIP != null && !xRealIP.isEmpty() && isValidIP(xRealIP)) {
-            return xRealIP;
-        }
-
-        return request.getRemoteAddr();
-    }
-
-    private boolean isValidIP(String ip) {
-        if (ip == null || ip.isEmpty()) {
-            return false;
-        }
-
-        // Blokuj oczywiste próby injection
-        if (ip.contains("..") || ip.contains(" ") || ip.contains(";") ||
-                ip.contains("'") || ip.contains("\"") || ip.contains("<") || ip.contains(">")) {
-            return false;
-        }
-
-        final String IPV4_REGEX = "^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
-                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
-                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
-                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
-
-        final String IPV6_REGEX = "^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$";
-
-        return ip.matches(IPV4_REGEX) || ip.matches(IPV6_REGEX);
+        return remoteAddr;
     }
 
     @Override

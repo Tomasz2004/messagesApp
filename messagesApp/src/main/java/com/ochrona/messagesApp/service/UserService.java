@@ -110,7 +110,7 @@ public class UserService {
     @Transactional
     public LoginResponse login(LoginRequest request) throws Exception {
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("Nieprawidłowa nazwa użytkownika lub hasło."));
+                .orElse(null);
 
         // Time attack protection
         boolean userExists = (user != null);
