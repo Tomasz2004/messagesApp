@@ -93,8 +93,8 @@ Poniżej krótki opis mechanizmów kryptograficznych użytych w projekcie, przep
 ### ⚠️ Dalsze możliwości rozwoju
 
 - Możliwośc edycji profilu użytkownika
-- Wyszukiwanie odbiorców, zamiast wybierania z listy
-- Lepsza walidacja hasła
+- Reset hasła
 - Oddzielenie produkcji od developmentu
+- IV reuse - do naprawy
 
 ---

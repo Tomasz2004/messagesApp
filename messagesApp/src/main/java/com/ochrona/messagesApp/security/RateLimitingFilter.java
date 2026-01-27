@@ -44,11 +44,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             .maximumSize(100_000)
             .build();
 
+    private final Cache<String, Bucket> lookupBuckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumSize(100_000)
+            .build();
+
     // Limity
     private static final int LOGIN_LIMIT = 5; // 5 prób logowania
     private static final int REGISTER_LIMIT = 3; // 3 próby rejestracji
     private static final int GENERAL_LIMIT = 100; // 100 zapytań ogólnych
     private static final Duration REFILL_DURATION = Duration.ofMinutes(1);
+    private static final int LOOKUP_LIMIT = 5; // 5 zapytań wyszukiwania
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -69,6 +75,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         } else if (path.contains("/auth/register") && "POST".equals(method)) {
             bucket = registerBuckets.get(clientIP, this::createRegisterBucket);
             limitType = "register";
+        } else if (path.contains("/users/lookup") && "GET".equals(method)) {
+            bucket = lookupBuckets.get(clientIP, this::createLookupBucket);
+            limitType = "lookup";
         } else {
             bucket = generalBuckets.get(clientIP, this::createGeneralBucket);
             limitType = "general";
@@ -121,6 +130,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private Bucket createGeneralBucket(String key) {
         return Bucket.builder()
                 .addLimit(Bandwidth.simple(GENERAL_LIMIT, REFILL_DURATION))
+                .build();
+    }
+
+    /**
+     * Bucket dla wyszukiwania użytkownika - 5 na minutę
+     */
+    private Bucket createLookupBucket(String key) {
+        return Bucket.builder()
+                .addLimit(Bandwidth.simple(5, Duration.ofMinutes(1)))
                 .build();
     }
 
